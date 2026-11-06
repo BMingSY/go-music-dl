@@ -1,5 +1,7 @@
 # Go Music DL
 
+> 本 fork 的非 WebView 桌面验证版位于 [native/](native/README.md)，目标为 Windows 11 x64 和 macOS。`custom` 为集成分支，所有修改通过 PR 合并。下方为保留的上游版本说明。
+
 > ⭐ 如果这个项目对你有帮助，欢迎点一个 Star。
 
 <p align="center">

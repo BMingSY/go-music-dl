@@ -1,0 +1,9 @@
+{
+  "name": "MusicDL Native",
+  "slug": "music-dl-native",
+  "identifier": "io.github.bmingsy.musicdl.native",
+  "version": "0.1.0",
+  "out": "dist",
+  "windows": { "displayName": "MusicDL Native", "installDirName": "MusicDLNative" },
+  "linux": { "webview": false }
+}
