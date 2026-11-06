@@ -101,7 +101,7 @@ func Browse(ctx context.Context, source, kind, query, id string, page int, cfg C
 			var ranks []model.TopList
 			ranks, err = n.GetTopLists()
 			for _, r := range ranks {
-				result.Collections = append(result.Collections, Collection{Playlist: model.Playlist{ID: r.ID, Name: r.Name, Cover: r.Cover, Description: r.Description, Source: source, TrackCount: r.TrackCount}, Kind: "rank"})
+				result.Collections = append(result.Collections, Collection{Playlist: model.Playlist{ID: r.ID, Name: r.Name, Cover: r.Cover, Description: r.Description, Source: source, TrackCount: r.TrackCount, PlayCount: int(r.PlayCount), Link: r.Link, Extra: map[string]string{"update_frequency": r.UpdateFrequency}}, Kind: "rank"})
 			}
 		case "rank":
 			songs, err = n.GetTopListSongs(id)

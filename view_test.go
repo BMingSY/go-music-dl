@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -186,11 +187,14 @@ func TestRenderPreview(t *testing.T) {
 		s.position = 63 * time.Second
 		s.duration = time.Duration(s.current.Duration) * time.Second
 	}
-	for _, name := range []string{"main", "main-playing", "song-menu", "list-tools", "player", "settings", "mini", "mini-paused", "mini-hover", "lyrics", "playlists", "playlist-editor", "collection-picker"} {
+	for _, name := range []string{"main", "main-playing", "song-menu", "list-tools", "player", "settings", "mini", "mini-paused", "mini-hover", "lyrics", "playlists", "playlist-editor", "collection-picker", "categories", "rankings", "recommend"} {
 		s.playing = name != "main" && name != "song-menu" && name != "mini-paused"
 		s.modal = ""
 		s.toolsOpen, s.songMenuOpen, s.lyricOpen = false, false, false
 		s.page = "library"
+		s.collectionKind = "song"
+		s.categories = nil
+		s.collections = nil
 		s.playerExpanded = name == "player"
 		view := s.view
 		w, h := 1080, 740
@@ -216,6 +220,22 @@ func TestRenderPreview(t *testing.T) {
 			if name == "collection-picker" {
 				s.pendingTracks = []library.Track{s.results[0]}
 				s.modal = "collections"
+			}
+		}
+
+		if name == "categories" {
+			h = 1000
+			s.collectionKind = "categories"
+			s.categories = []model.PlaylistCategory{{ID: "zh", Name: "华语", Group: "语种", Hot: true}, {ID: "en", Name: "欧美", Group: "语种", Hot: true}, {ID: "jp", Name: "日语", Group: "语种"}, {ID: "pop", Name: "流行", Group: "风格", Hot: true}, {ID: "rock", Name: "摇滚", Group: "风格"}, {ID: "quiet", Name: "安静", Group: "情感"}}
+		}
+		if name == "rankings" || name == "recommend" {
+			h = 1000
+			s.collectionKind = "ranks"
+			if name == "recommend" {
+				s.collectionKind = "recommend"
+			}
+			for i, title := range []string{"飙升榜", "新歌榜", "原创榜", "热歌榜"} {
+				s.collections = append(s.collections, library.Collection{Playlist: model.Playlist{ID: fmt.Sprint(i), Source: "netease", Name: title, TrackCount: 100, PlayCount: 2380000, Extra: map[string]string{"update_frequency": "每天更新"}}, Kind: "rank"})
 			}
 		}
 

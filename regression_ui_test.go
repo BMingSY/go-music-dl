@@ -7,6 +7,7 @@ import (
 	"github.com/egoist/mygo/ui"
 	"github.com/guohuiyuan/music-lib/model"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -57,7 +58,11 @@ func TestCreateEditAddAndReloadPlaylist(t *testing.T) {
 	if err := tt.Click("编辑歌单名称"); err != nil {
 		t.Fatal(err)
 	}
-	tt.Key(ui.Ctrl, ui.KeyA)
+	modifier := ui.Ctrl
+	if runtime.GOOS == "darwin" {
+		modifier = ui.Super
+	}
+	tt.Key(modifier, ui.KeyA)
 	tt.Type("修改后的歌单")
 	tt.Frame()
 	if err := tt.Click("保存歌单"); err != nil {

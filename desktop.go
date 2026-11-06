@@ -208,17 +208,6 @@ func (s *app) selectedTracks() []library.Track {
 	}
 	return out
 }
-func (s *app) savePlaylist(name string, tracks []library.Track) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		s.status = "请输入歌单名称"
-		return
-	}
-	s.cfg.Playlists = append(s.cfg.Playlists, library.Playlist{ID: fmt.Sprint(time.Now().UnixNano()), Name: name, Tracks: append([]library.Track(nil), tracks...)})
-	s.playlistName = ""
-	s.pendingTracks = nil
-	s.save()
-}
 func (s *app) addToPlaylist(id string, tracks []library.Track) {
 	for _, p := range s.cfg.Playlists {
 		if p.ID != id {
@@ -351,6 +340,10 @@ func (s *app) artwork(t library.Track) *ui.Bitmap {
 	}
 	if img, ok := s.images[key]; ok {
 		return img
+	}
+	// Headless renders use supplied fixtures and never start network requests.
+	if s.win == nil {
+		return nil
 	}
 	if s.imagePending[key] {
 		return nil
@@ -557,4 +550,13 @@ func (s *app) pickLocalFiles() {
 			s.localMusic()
 		})
 	}()
+}
+
+func (s *app) cancelBrowse() {
+	if s.searchCancel != nil {
+		s.searchCancel()
+		s.searchCancel = nil
+	}
+	s.searchID++
+	s.searching = false
 }

@@ -14,6 +14,7 @@ import (
 )
 
 func (s *app) openSavedPlaylists() {
+	s.cancelBrowse()
 	s.page = "playlists"
 	s.collections = nil
 	s.categories = nil
@@ -175,25 +176,17 @@ func (s *app) localPlaylistsView(c *ui.Context) {
 	})
 }
 func (s *app) playlistCoverView(c *ui.Context, name, cover, id string, size float32) {
-	if cover != "" {
-		if img := s.artwork(library.Track{Song: model.Song{Source: "netease", ID: "playlist:" + id, Cover: cover}}); img != nil {
-			ui.Image(c, img).Size(size, size).Fit(ui.Cover)
-			return
-		}
+	if cover == "" {
+		cover = "https://picsum.photos/seed/col_" + url.PathEscape(id) + "/400/400"
 	}
-	colors := [][2]string{{"#34d399", "#059669"}, {"#38bdf8", "#6366f1"}, {"#ff9a9e", "#f68084"}}
-	choice := 0
-	for _, r := range id {
-		choice = (choice + int(r)) % len(colors)
+	if img := s.artwork(library.Track{Song: model.Song{Source: "netease", ID: "playlist:" + id, Cover: cover}}); img != nil {
+		ui.Image(c, img).Size(size, size).Fit(ui.Cover)
+	} else {
+		ui.Box(c).Size(size, size).Background(ui.Hex("#eeeeee"))
 	}
-	ui.Column(c).Size(size, size).Gradient(ui.Hex(colors[choice][0]), ui.Hex(colors[choice][1]), 135).AlignItems(ui.Center).Justify(ui.Center).Gap(12).Children(func() {
-		glyph(c, "music", min(42, size*.5), white.Alpha(.85))
-		if size >= 100 {
-			ui.Text(c, name).FontSize(18).Bold().TextColor(white).TextAlign(ui.Center).MaxLines(2).PaddingX(18)
-		}
-	})
 }
 func (s *app) openSavedPlaylist(p library.Playlist) {
+	s.cancelBrowse()
 	s.page = "collection"
 	s.localPlaylistID = p.ID
 	s.collectionTitle = p.Name

@@ -52,11 +52,18 @@ func (s *app) view(c *ui.Context) {
 			ui.Scroll(c.Key("page-scroll")).Fill().TrackScroll(&s.scroll).Children(func() {
 				ui.Column(c).Width(min(900, w-40)).AlignSelf(ui.Center).Padding(40, 0, 150, 0).Children(func() {
 					s.searchBox(c)
+					s.browseCurrentView(c)
 					if s.page == "playlists" {
 						s.localPlaylistsView(c)
-					} else if len(s.categories) > 0 {
+					} else if s.page == "library" && s.collectionKind == "categories" {
 						s.categoriesView(c)
-					} else if len(s.collections) > 0 {
+					} else if s.page == "library" && s.collectionKind == "ranks" {
+						s.rankingsView(c)
+					} else if s.page == "library" && (s.collectionKind == "recommend" || s.collectionKind == "mine") {
+						s.sourcePlaylistsView(c)
+					} else if s.page == "library" && len(s.categories) > 0 {
+						s.categoriesView(c)
+					} else if s.page == "library" && len(s.collections) > 0 {
 						s.collectionsView(c)
 					} else {
 						s.resultsView(c)
@@ -155,14 +162,15 @@ func (s *app) searchBox(c *ui.Context) {
 		if !s.sourceCollapsed {
 			ui.Grid(c).Columns(5).Gap(12).Children(func() {
 				for _, src := range []struct{ id, label string }{{"netease", "网易云音乐"}, {"bilibili", "Bilibili"}, {"local", "本地音乐"}} {
-					active := s.selected[src.id]
+					enabled := s.searchKind == "song" || (s.searchKind == "playlist" && src.id != "local") || (s.searchKind == "album" && src.id == "netease")
+					active := enabled && s.selected[src.id]
 					bg, fg, bd := white, ui.Hex("#4a5568"), border
 					if active {
 						bg = ui.Hex("#eff3ff")
 						fg = accent
 						bd = accent
 					}
-					button := ui.Button(c.Key("source-"+src.id), "").Label(src.label).Padding(10, 8).Height(58).Radius(12).Background(bg).Border(2, bd).OnClick(func() { s.selected[src.id] = !s.selected[src.id] }).Children(func() {
+					button := ui.Button(c.Key("source-"+src.id), "").Label(src.label).Disabled(!enabled).Padding(10, 8).Height(58).Radius(12).Background(bg).Border(2, bd).OnClick(func() { s.selected[src.id] = !s.selected[src.id] }).Children(func() {
 						ui.Column(c).AlignItems(ui.Center).Gap(3).Children(func() {
 							ui.Text(c, src.id).FontSize(14).Bold().TextColor(fg)
 							ui.Text(c, src.label).FontSize(11).TextColor(ui.Hex("#a0aec0"))
@@ -229,7 +237,7 @@ func (s *app) resultsView(c *ui.Context) {
 			ui.Button(c, "上传文件").FontSize(12).MarginX(4).Radius(8).OnClick(s.pickLocalFiles)
 			ui.Button(c, "上传文件夹").FontSize(12).MarginX(4).Radius(8).OnClick(s.pickFolder)
 		}
-		if s.currentCollection != nil {
+		if s.currentCollection != nil && s.page == "library" {
 			ui.Button(c, "下载整个歌单").Radius(18).TextColor(accent).FontSize(12).OnClick(func() { s.addDownloads(tracks) })
 			ui.Button(c, "导入本地").Radius(18).TextColor(accent).FontSize(12).OnClick(func() { s.importCollection(*s.currentCollection, tracks) })
 		}
@@ -406,41 +414,8 @@ func (s *app) trackCover(c *ui.Context, t library.Track, size float32) {
 }
 func (s *app) collectionsView(c *ui.Context) {
 	width, _ := c.Size()
-	contentWidth := min(900, width-40)
-	cols := max(1, int((contentWidth+20)/200))
-	size := (contentWidth - float32(cols-1)*20) / float32(cols)
 	s.collectionResultHeader(c, len(s.collections), s.searchKind)
-	ui.Grid(c).Columns(cols).Gap(20).Children(func() {
-		for _, p := range s.collections {
-			card := ui.Column(c.Key(p.Source+":"+p.ID)).Background(white).Radius(16).Clip().Shadow(0, 4, 6, 0, ui.RGBA(0, 0, 0, .05))
-			cardMotion(card, 5)
-			card.Children(func() {
-				ui.Box(c).OnClick(func() { s.openCollection(p) }).Children(func() {
-					s.playlistCoverView(c, p.Name, p.Cover, p.ID, size)
-					ui.Text(c, p.Source).Absolute().Right(5).Top(5).FontSize(10).TextColor(accent).Background(ui.Hex("#e6fffa")).Radius(4).Padding(2, 8)
-				})
-				ui.Column(c).Padding(12).Gap(6).Children(func() {
-					ui.Text(c, p.Name).FontSize(14).Bold().MaxLines(2).OnClick(func() { s.openCollection(p) })
-					ui.Text(c, p.Creator).FontSize(12).TextColor(muted).SingleLine().Ellipsis("…")
-					ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-						ui.Text(c, fmt.Sprintf("共 %d 首", p.TrackCount)).FontSize(11).TextColor(ui.Hex("#a0aec0")).Grow(1)
-						ui.Button(c, "导入本地").FontSize(12).TextColor(accent).Disabled(s.importBusy).OnClick(func() { s.importRemoteCollection(p) })
-					})
-					ui.Button(c, "下载整个歌单").FillWidth().Height(32).FontSize(12).Radius(20).TextColor(accent).Border(1, ui.Hex("#b7ebd6")).Background(ui.Hex("#f0fff9")).OnClick(func() { s.downloadRemoteCollection(p) })
-				})
-			})
-		}
-	})
-}
-func (s *app) categoriesView(c *ui.Context) {
-	ui.Column(c).Padding(20).Radius(16).Background(white).Gap(16).Children(func() {
-		ui.Text(c, "歌单分类").Bold()
-		ui.Row(c).Wrap().Gap(10).Children(func() {
-			for _, cat := range s.categories {
-				ui.Button(c.Key(cat.ID), cat.Name).Radius(20).FontSize(13).OnClick(func() { s.browse("category", "netease", cat.ID) })
-			}
-		})
-	})
+	s.collectionCards(c, min(900, width-40), 20, 180, false)
 }
 func (s *app) toolbar(c *ui.Context, h float32) {
 	ui.Column(c).Absolute().Right(14).Top(max(20, (h-320)/2)).Gap(6).AlignItems(ui.Center).Children(func() {
