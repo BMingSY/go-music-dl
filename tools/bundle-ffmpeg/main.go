@@ -358,15 +358,11 @@ func (b *builder) bundle() error {
 			return err
 		}
 	}
-	pattern := filepath.Join(b.prefix, "lib", "libav*.dylib")
+	pattern := filepath.Join(b.prefix, "lib", "lib*.dylib")
 	if b.system == "windows" {
 		pattern = filepath.Join(b.prefix, "bin", "*.dll")
 	}
 	libs, _ := filepath.Glob(pattern)
-	if b.system == "darwin" {
-		more, _ := filepath.Glob(filepath.Join(b.prefix, "lib", "libsw*.dylib"))
-		libs = append(libs, more...)
-	}
 	for _, path := range libs {
 		name := filepath.Base(path)
 		if b.system == "windows" && name == "libzlib.dll" {
@@ -414,5 +410,43 @@ func (b *builder) bundle() error {
 		return err
 	})
 	fmt.Printf("Media resources: %.2f MiB (%s)\n", float64(size)/(1<<20), dest)
+	if b.system == "darwin" {
+		return auditDarwinLibraries(dest)
+	}
+	return nil
+}
+
+// Check the relocated bundle, including dependencies of dependencies. A build
+// must not accidentally depend on Homebrew or on a library left in the cache.
+func auditDarwinLibraries(dir string) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !(strings.HasSuffix(entry.Name(), ".dylib") || entry.Name() == "ffmpeg" || entry.Name() == "ffprobe") {
+			continue
+		}
+		out, err := exec.Command("otool", "-L", filepath.Join(dir, entry.Name())).Output()
+		if err != nil {
+			return err
+		}
+		for _, line := range strings.Split(string(out), "\n")[1:] {
+			fields := strings.Fields(line)
+			if len(fields) == 0 {
+				continue
+			}
+			dependency := fields[0]
+			if strings.HasPrefix(dependency, "/usr/lib/") || strings.HasPrefix(dependency, "/System/Library/") {
+				continue
+			}
+			if !strings.HasPrefix(dependency, "@") {
+				return fmt.Errorf("%s has a non-relocatable dependency: %s", entry.Name(), dependency)
+			}
+			if _, err := os.Stat(filepath.Join(dir, filepath.Base(dependency))); err != nil {
+				return fmt.Errorf("%s is missing dependency %s", entry.Name(), dependency)
+			}
+		}
+	}
 	return nil
 }
