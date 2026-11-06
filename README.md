@@ -2,6 +2,8 @@
 
 音乐搜索、播放与下载，支持网易云音乐、Bilibili 和本地音乐。
 
+![music-dl](screenshots/desktop.png)
+
 ## 安装
 
 从 [Releases](https://github.com/BMingSY/go-music-dl/releases) 下载 Windows 11 x64 或 macOS 13+ 安装包。macOS 分为 Apple Silicon 和 Intel 两个版本。
