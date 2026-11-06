@@ -11,6 +11,12 @@ import (
 
 func (s *app) modalView(c *ui.Context, w, h float32) {
 	titles := map[string]string{"settings": "系统设置", "collections": "本地歌单", "login": "扫码登录", "downloads": "下载管理", "about": "关于 music-dl"}
+	titles["collections"] = "收藏到我的歌单"
+	titles["edit-playlist"] = "新建歌单"
+	if s.editPlaylistID != "" {
+		titles["edit-playlist"] = "编辑歌单"
+	}
+	titles["import-playlist"] = "导入歌单"
 	width, height := float32(640), min(h-40, 600)
 	if s.modal == "settings" {
 		width = 760
@@ -20,9 +26,21 @@ func (s *app) modalView(c *ui.Context, w, h float32) {
 		width = 420
 		height = 430
 	}
-	back := ui.Box(c.Key("modal-backdrop")).Absolute().Fill().Background(ui.RGBA(0, 0, 0, .5)).Center().Modal()
+	if s.modal == "edit-playlist" {
+		width = 400
+		height = min(h-40, 400)
+	}
+	if s.modal == "collections" {
+		width = 400
+		height = min(h-40, 520)
+	}
+	if s.modal == "import-playlist" {
+		width = 440
+		height = min(h-40, 280)
+	}
+	back := ui.Box(c.Key("modal-backdrop")).Absolute().Fill().Background(ui.RGBA(0, 0, 0, .5)).Center().Modal().Transition(ui.ElementTransition{Enter: &ui.Motion{}, Exit: &ui.Motion{}})
 	back.Children(func() {
-		ui.Column(c).Size(min(w-40, width), height).Background(white).Radius(18).Border(1, ui.Hex("#dcebe4")).Shadow(0, 20, 40, 0, ui.RGBA(0, 0, 0, .2)).Clip().Children(func() {
+		ui.Column(c).Size(min(w-40, width), height).Background(white).Radius(18).Border(1, ui.Hex("#dcebe4")).Shadow(0, 20, 40, 0, ui.RGBA(0, 0, 0, .2)).Clip().Transition(panelTransition).Children(func() {
 			ui.Row(c).Padding(20, 22, 16, 22).BorderWidth(0, 0, 1, 0).BorderColor(ui.Hex("#edf2f7")).AlignItems(ui.Center).Children(func() {
 				ui.Column(c).Grow(1).Gap(4).Children(func() {
 					ui.Text(c, titles[s.modal]).FontSize(18).Bold()
@@ -44,6 +62,10 @@ func (s *app) modalView(c *ui.Context, w, h float32) {
 					s.downloadsView(c)
 				case "about":
 					s.aboutView(c)
+				case "edit-playlist":
+					s.editPlaylistView(c)
+				case "import-playlist":
+					s.importLinkView(c)
 				}
 			})
 		})
@@ -132,9 +154,9 @@ func (s *app) settingsView(c *ui.Context) {
 	ui.PrimaryButton(c, "保存设置").FillWidth().Height(40).FontSize(14).FontWeight(600).OnClick(func() { s.save(); s.closeModal() })
 }
 func (s *app) savedPlaylistsView(c *ui.Context) {
-	ui.Row(c).Gap(8).Children(func() {
-		ui.TextInput(c, &s.playlistName).Label("歌单名称").Placeholder("新歌单名称").Grow(1)
-		ui.PrimaryButton(c, "新建歌单").OnClick(func() { s.savePlaylist(s.playlistName, s.pendingTracks) })
+	ui.Row(c).AlignItems(ui.Center).Children(func() {
+		ui.Text(c, "选择或管理歌单").FontSize(14).TextColor(muted).Grow(1)
+		ui.PrimaryButton(c, "+ 新建").Label("新建歌单").Radius(20).Padding(6, 12).FontSize(12).OnClick(func() { s.editPlaylist(nil) })
 	})
 	ui.Scroll(c).Grow(1).Children(func() {
 		ui.Column(c).Gap(10).Children(func() {
@@ -182,6 +204,9 @@ func (s *app) savedPlaylistsView(c *ui.Context) {
 			}
 		})
 	})
+	if s.playlistError != "" {
+		ui.Text(c, s.playlistError).FontSize(12).TextColor(ui.Hex("#e53e3e"))
+	}
 	ui.Row(c).Gap(8).Children(func() {
 		ui.Button(c, "导入歌单").OnClick(s.importPlaylists)
 		ui.Button(c, "导出歌单").OnClick(s.exportPlaylists)

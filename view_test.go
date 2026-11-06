@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -149,11 +150,41 @@ func TestRenderPreview(t *testing.T) {
 	}
 	s := newApp(context.Background(), library.Config{Volume: .7}, "")
 	s.results = []library.Track{{Song: model.Song{ID: "1", Source: "netease", Name: "夜に駆ける", Artist: "YOASOBI", Duration: 258}}, {Song: model.Song{ID: "2", Source: "netease", Name: "无声的星空", Artist: "本地音乐", Duration: 216}}, {Song: model.Song{ID: "3", Source: "bilibili", Name: "钢琴与雨", Artist: "Bilibili", Duration: 185}}}
+	if fixture := os.Getenv("MUSIC_DL_REVIEW_FIXTURE"); fixture != "" {
+		var track library.Track
+		b, e := os.ReadFile(filepath.Join(fixture, "track.json"))
+		if e != nil {
+			t.Fatal(e)
+		}
+		if e = json.Unmarshal(b, &track); e != nil {
+			t.Fatal(e)
+		}
+		b, e = os.ReadFile(filepath.Join(fixture, "cover.jpg"))
+		if e != nil {
+			t.Fatal(e)
+		}
+		s.cover, e = ui.DecodeBitmap(b)
+		if e != nil {
+			t.Fatal(e)
+		}
+		s.results[0] = track
+	}
 	s.current = &s.results[0]
 	s.duration = 258 * time.Second
 	s.position = 36 * time.Second
 	s.playing = true
 	s.lines = lyrics.Parse("[00:00]让音乐陪伴每一个日常\n[00:30]此刻的旋律，留在小小的窗口里")
+	if fixture := os.Getenv("MUSIC_DL_REVIEW_FIXTURE"); fixture != "" {
+		b, e := os.ReadFile(filepath.Join(fixture, "lyrics.lrc"))
+		if e != nil {
+			t.Fatal(e)
+		}
+		s.lines = lyrics.Parse(string(b))
+		data, _ := json.Marshal(s.lines)
+		_ = os.WriteFile(filepath.Join(dir, "lyric-groups.json"), data, 0600)
+		s.position = 63 * time.Second
+		s.duration = time.Duration(s.current.Duration) * time.Second
+	}
 	for _, name := range []string{"main", "main-playing", "song-menu", "list-tools", "player", "settings", "mini", "mini-paused", "lyrics"} {
 		s.playing = name != "main" && name != "song-menu" && name != "mini-paused"
 		s.modal = ""
@@ -163,7 +194,7 @@ func TestRenderPreview(t *testing.T) {
 		w, h := 1080, 740
 		if name == "mini" || name == "mini-paused" {
 			view = s.miniView
-			w, h = 304, 50
+			w, h = 236, 50
 		}
 		if name == "settings" {
 			s.modal = "settings"
@@ -172,8 +203,9 @@ func TestRenderPreview(t *testing.T) {
 			s.lyricOpen = true
 		}
 		tt := ui.NewTester(view, w, h)
+		tt.Advance(time.Second)
 		if name == "song-menu" {
-			if err := tt.Click("更多操作 夜に駆ける"); err != nil {
+			if err := tt.Click("更多操作 " + s.results[0].Name); err != nil {
 				t.Fatal(err)
 			}
 		}

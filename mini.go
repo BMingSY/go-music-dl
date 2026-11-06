@@ -22,75 +22,87 @@ func (s *app) miniView(c *ui.Context) {
 	theme.FontSize = 12
 	theme.Font = desktopFont()
 	c.SetTheme(theme)
-	ui.Row(c.Key("mini")).Fill().Padding(4).Gap(8).AlignItems(ui.Center).Background(white).Border(1, ui.Hex("#eeeeee")).Children(func() {
-		box := ui.Box(c.Key("cover-drag")).Size(40, 40).DragWindow()
-		box.Children(func() { s.coverView(c, 40) })
-		ui.Column(c.Key("caption")).Grow(1).Clip().DragWindow().Gap(2).Children(func() {
-			text, elapsed := s.miniCaption()
-			frameAt := c.Now()
-			ui.Box(c).Height(20).Label(text).Clip().Draw(func(p *ui.Painter, r ui.Rect) {
-				span := ui.Span{Text: text, Size: 12, Font: s.lyricFont(), Color: ui.Hex("#222222"), Weight: 400}
-				width, height := p.MeasureText(0, span)
-				shift := float32(0)
-				if s.playing && width > r.W {
-					shift = float32(math.Mod(max(0, elapsed.Seconds()+p.Now().Sub(frameAt).Seconds()-.8)*25, float64(width+30)))
-					p.AnimationFrameRate(30)
+	root := ui.Box(c.Key("mini")).Fill().Lang("zh-CN").Background(white).Radius(6).Border(1, ui.Hex("#e2e8f0"))
+	hovered := root.Hovered()
+	if !hovered {
+		s.miniVolumeOpen = false
+	}
+	root.Children(func() {
+		ui.Row(c).Fill().Padding(5).Gap(8).AlignItems(ui.Center).Children(func() {
+			ui.Box(c).Size(38, 38).Radius(3).Clip().DragWindow().Children(func() { s.coverView(c, 38) })
+			caption := ui.Column(c.Key("caption")).Grow(1).Gap(1).Clip().DragWindow()
+			fade := float32(0)
+			if hovered {
+				fade = 1
+			}
+			caption.AnimatePose(ui.Pose{Fade: fade}, hoverAnimation)
+			caption.Children(func() {
+				text, elapsed := s.miniCaption()
+				translation := ""
+				if i := lyrics.Index(s.lines, s.position); s.playing && i >= 0 {
+					translation = s.lines[i].Translation
 				}
-				p.RichText(r.X-shift, r.Y+(r.H-height)/2, 0, span)
-				if shift > 0 {
-					p.RichText(r.X-shift+width+30, r.Y+(r.H-height)/2, 0, span)
+				if !s.playing && s.current != nil {
+					translation = s.current.Artist
+				}
+				scrollingCaption(c, text, s.lyricFont(), 12, ui.Hex("#222222"), elapsed, s.playing)
+				if translation != "" {
+					scrollingCaption(c, translation, s.lyricFont(), 10.5, muted, elapsed, s.playing)
 				}
 			})
-			if !s.playing && s.current != nil {
-				ui.Text(c, s.current.Artist).FontSize(10).TextColor(muted).SingleLine().Ellipsis("…")
-			}
 		})
-		ui.Row(c).Gap(0).AlignItems(ui.Center).Children(func() {
-			favorite := s.current != nil && s.isFavorite(*s.current)
-			color := muted
-			if favorite {
-				color = ui.Hex("#cb292f")
-			}
-			colorIconButton(c, "favorite", "heart", "收藏当前歌曲", 23, color, !favorite).OnClick(func() {
-				if s.current != nil {
-					s.favorite(*s.current)
-				}
-			})
-			play := "play"
+		controls := ui.Row(c.Key("mini-controls")).Absolute().Left(49).Right(3).Top(5).Bottom(5).Background(white.Alpha(.98)).Gap(2).AlignItems(ui.Center).Justify(ui.Center)
+		fade := float32(1)
+		if hovered {
+			fade = 0
+		}
+		controls.AnimatePose(ui.Pose{Fade: fade}, hoverAnimation).IgnoreInput(!hovered)
+		controls.Children(func() {
+			iconButton(c, "prev", "prev", "上一首", 26).OnClick(func() { s.step(-1) })
+			icon := "play"
 			if s.playing {
-				play = "pause"
+				icon = "pause"
 			}
-			iconButton(c, "toggle", play, "播放或暂停", 23).OnClick(s.toggle)
-			iconButton(c, "volume", "volume", "调节音量", 23).OnClick(func() { s.miniVolumeOpen = !s.miniVolumeOpen })
-			if s.miniVolumeOpen {
-				v := s.cfg.Volume
-				if ui.Slider(c.Key("mini-volume"), &v, 0, 1).Absolute().Bottom(1).Right(26).Width(82).Height(10).Label("悬浮窗音量").Changed() {
-					s.volume(v)
-				}
-			}
-			iconButton(c, "queue", "list", "播放队列", 23).OnClick(func() {
-				s.page = "queue"
-				s.collections = nil
-				s.categories = nil
+			iconButton(c, "toggle", icon, "播放或暂停", 26).OnClick(s.toggle)
+			iconButton(c, "next", "next", "下一首", 26).OnClick(func() { s.step(1) })
+			iconButton(c, "volume", "volume", "调节音量", 26).OnClick(func() { s.miniVolumeOpen = !s.miniVolumeOpen })
+			iconButton(c, "restore", "mini", "打开主窗口", 24).OnClick(func() {
 				if s.win != nil {
 					s.win.Show()
 					s.win.Focus()
 				}
 			})
-		})
-		ui.Column(c).Gap(0).Children(func() {
-			iconButton(c, "hide", "close", "隐藏悬浮窗", 15).OnClick(func() {
+			iconButton(c, "hide", "close", "隐藏悬浮窗", 22).OnClick(func() {
 				if s.mini != nil {
 					s.mini.Hide()
 				}
 			})
-			ui.Button(c, "□").Label("打开主窗口").Size(15, 15).Padding(0).Border(0, ui.Transparent).Background(white).FontSize(10).OnClick(func() {
-				if s.win != nil {
-					s.win.Show()
-					s.win.Focus()
-				}
-			})
 		})
+		if s.miniVolumeOpen {
+			ui.Row(c).Absolute().Left(57).Right(8).Bottom(1).Height(15).Background(white).Gap(4).AlignItems(ui.Center).Children(func() {
+				v := s.cfg.Volume
+				if slimSlider(c, "悬浮窗音量", &v, 1).Grow(1).Changed() {
+					s.volume(v)
+				}
+				ui.Button(c, "完成").FontSize(10).Padding(0).Height(15).OnClick(func() { s.miniVolumeOpen = false })
+			})
+		}
+	})
+}
+func scrollingCaption(c *ui.Context, text, font string, size float32, color ui.Color, elapsed time.Duration, playing bool) {
+	frameAt := c.Now()
+	ui.Box(c).Height(size + 5).Label(text).Clip().Draw(func(p *ui.Painter, r ui.Rect) {
+		span := ui.Span{Text: text, Size: size, Font: font, Color: color, Weight: 400}
+		width, height := p.MeasureText(0, span)
+		shift := float32(0)
+		if playing && width > r.W {
+			shift = float32(math.Mod(max(0, elapsed.Seconds()+p.Now().Sub(frameAt).Seconds()-.8)*25, float64(width+30)))
+			p.AnimationFrameRate(30)
+		}
+		p.RichText(r.X-shift, r.Y+(r.H-height)/2, 0, span)
+		if shift > 0 {
+			p.RichText(r.X-shift+width+30, r.Y+(r.H-height)/2, 0, span)
+		}
 	})
 }
 func (s *app) miniCaption() (string, time.Duration) {

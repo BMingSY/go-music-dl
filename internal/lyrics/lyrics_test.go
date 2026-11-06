@@ -23,3 +23,20 @@ func TestTimedLyricsOffsetsAndRepeatedTimestamps(t *testing.T) {
 		t.Fatalf("early lyric = %q", got)
 	}
 }
+
+func TestVerbatimWordsAndBilingualRowsStayTogether(t *testing.T) {
+	raw := "[00:01.000]君[00:01.500]の[00:02.000]声[00:03.000]\n[00:01.000]ki mi no ko e[00:03.000]\n[00:01.000]你的声音[00:03.000]\n[00:04.000]次の行[00:06.000]"
+	lines := Parse(raw)
+	if len(lines) != 2 {
+		t.Fatalf("word stamps became rows: %+v", lines)
+	}
+	if lines[0].Text != "君の声" || lines[0].Translation != "你的声音" || len(lines[0].Words) != 3 {
+		t.Fatalf("lost bilingual lyric: %+v", lines[0])
+	}
+	if text, _ := Current(lines, 2500*time.Millisecond); text != "君の声" {
+		t.Fatalf("selected word or translation as whole row: %q", text)
+	}
+	if lines[0].Words[1].At != 1500*time.Millisecond || lines[0].Words[1].End != 2*time.Second {
+		t.Fatal("lost word timing")
+	}
+}

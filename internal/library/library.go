@@ -57,54 +57,79 @@ func provider(source string, cfg Config) (Provider, error) {
 }
 
 func Search(ctx context.Context, source, query string, cfg Config) ([]Track, error) {
-	if source == "local" {
-		tracks, err := Scan(ctx, cfg.MusicDir, query)
-		if os.IsNotExist(err) {
-			err = nil
+	result, err := searchCatalog(ctx, source, query, cfg)
+	return result.Tracks, err
+}
+
+func searchCatalog(ctx context.Context, source, query string, cfg Config) (Catalog, error) {
+	if source != "local" {
+		p, err := provider(source, cfg)
+		if err != nil {
+			return Catalog{}, err
 		}
-		seen := map[string]bool{}
-		for _, t := range tracks {
-			seen[t.Path] = true
-		}
-		for _, path := range cfg.LocalFiles {
-			if seen[path] {
-				continue
-			}
-			t, e := LocalTrack(path)
-			if e == nil && (query == "" || strings.Contains(strings.ToLower(t.Name+" "+t.Artist), strings.ToLower(query))) {
-				tracks = append(tracks, t)
-			}
-		}
-		return tracks, err
+		return searchRemote(ctx, source, strings.TrimSpace(query), p)
 	}
-	p, err := provider(source, cfg)
-	if err != nil {
-		return nil, err
+	tracks, err := searchLocal(ctx, query, cfg)
+	return Catalog{Tracks: tracks}, err
+}
+
+func searchLocal(ctx context.Context, query string, cfg Config) ([]Track, error) {
+	tracks, err := Scan(ctx, cfg.MusicDir, query)
+	if os.IsNotExist(err) {
+		err = nil
 	}
+	seen := map[string]bool{}
+	for _, t := range tracks {
+		seen[t.Path] = true
+	}
+	for _, path := range cfg.LocalFiles {
+		if seen[path] {
+			continue
+		}
+		t, e := LocalTrack(path)
+		if e == nil && (query == "" || strings.Contains(strings.ToLower(t.Name+" "+t.Artist), strings.ToLower(query))) {
+			tracks = append(tracks, t)
+		}
+	}
+	return tracks, err
+}
+
+func searchRemote(ctx context.Context, source, query string, p Provider) (Catalog, error) {
+	var result Catalog
 	query = strings.TrimSpace(query)
 	if query == "" {
-		return nil, errors.New("请输入歌名、作者或分享链接")
+		return result, errors.New("请输入歌名、作者或分享链接")
 	}
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return result, err
 	}
 	var songs []model.Song
+	var err error
 	if u, e := url.Parse(query); e == nil && (u.Scheme == "https" || u.Scheme == "http") {
-		song, e := p.Parse(query)
-		if e != nil {
-			return nil, e
-		}
-		if song != nil {
-			songs = []model.Song{*song}
+		// Bilibili video URLs may name a single video, multipart video or a
+		// season. ParsePlaylist handles all three without throwing away the
+		// container metadata or turning "playlist link detected" into an error.
+		if cp, ok := p.(collectionProvider); ok && source == "bilibili" {
+			meta, items, e := cp.ParsePlaylist(query)
+			err, songs = e, items
+			if meta != nil && (len(items) > 1 || meta.Extra["type"] == "season") {
+				result.Container = &Collection{Playlist: *meta, Kind: "playlist"}
+			}
+		} else {
+			song, e := p.Parse(query)
+			err = e
+			if song != nil {
+				songs = []model.Song{*song}
+			}
 		}
 	} else {
 		songs, err = p.Search(query)
 	}
 	if err != nil {
-		return nil, err
+		return result, err
 	}
 	if err = ctx.Err(); err != nil {
-		return nil, err
+		return result, err
 	}
 	tracks := make([]Track, 0, len(songs))
 	for _, song := range songs {
@@ -112,7 +137,8 @@ func Search(ctx context.Context, source, query string, cfg Config) ([]Track, err
 			tracks = append(tracks, Track{Song: song})
 		}
 	}
-	return tracks, nil
+	result.Tracks = tracks
+	return result, nil
 }
 
 func Resolve(ctx context.Context, t Track, cfg Config) (Resolved, error) {

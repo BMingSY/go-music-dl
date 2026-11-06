@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -42,7 +43,16 @@ func ExportVideo(ctx context.Context, ffmpeg, audioPath, output, title, artist, 
 	name := staged.Name()
 	staged.Close()
 	defer os.Remove(name)
-	args = append(args, "-i", audioPath, "-map", "0:v:0", "-map", "1:a:0", "-vf", filter, "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-t", fmt.Sprintf("%.3f", duration.Seconds()), "-shortest", "-movflags", "+faststart", name)
+	args = append(args, "-i", audioPath, "-map", "0:v:0", "-map", "1:a:0", "-vf", filter)
+	switch runtime.GOOS {
+	case "windows":
+		args = append(args, "-c:v", "h264_mf", "-hw_encoding", "0", "-b:v", "4M", "-pix_fmt", "nv12")
+	case "darwin":
+		args = append(args, "-c:v", "h264_videotoolbox", "-allow_sw", "1", "-b:v", "4M", "-pix_fmt", "yuv420p")
+	default:
+		args = append(args, "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p")
+	}
+	args = append(args, "-c:a", "aac", "-b:a", "192k", "-t", fmt.Sprintf("%.3f", duration.Seconds()), "-shortest", "-movflags", "+faststart", name)
 	cmd := exec.CommandContext(ctx, ffmpeg, args...)
 	cmd.Dir = dir
 	quietProcess(cmd)

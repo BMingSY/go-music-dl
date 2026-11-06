@@ -26,7 +26,6 @@ type Config struct {
 	PageSize       int                 `json:"page_size"`
 	LyricSize      float32             `json:"lyric_size"`
 	PlayMode       string              `json:"play_mode"`
-	ShowMascot     bool                `json:"show_mascot"`
 }
 
 type Shortcut struct {
@@ -48,7 +47,7 @@ func ConfigPath() (string, error) {
 
 func LoadConfig(path string) (Config, error) {
 	home, _ := os.UserHomeDir()
-	c := Config{MusicDir: filepath.Join(home, "Music"), Volume: 0.7, DownloadDir: filepath.Join(home, "Music", "music-dl"), PageSize: 30, LyricSize: 24, ShowMascot: true, FloatingLyrics: true, EmbedMetadata: true, SaveLyrics: true}
+	c := Config{MusicDir: filepath.Join(home, "Music"), Volume: 0.7, DownloadDir: filepath.Join(home, "Music", "music-dl"), PageSize: 30, LyricSize: 24, FloatingLyrics: true, EmbedMetadata: true, SaveLyrics: true}
 	b, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return c, nil

@@ -45,6 +45,7 @@ func (s *app) browse(kind, source, id string) {
 	s.pageNumber = 1
 	s.scroll = ui.ScrollState{}
 	s.collectionTitle = ""
+	s.currentCollection = nil
 	s.collectionKind = kind
 	s.collectionID = id
 	cfg, query := s.cfg, strings.TrimSpace(s.query)
@@ -86,6 +87,9 @@ func (s *app) browse(kind, source, id string) {
 				all.Tracks = append(all.Tracks, r.data.Tracks...)
 				all.Collections = append(all.Collections, r.data.Collections...)
 				all.Categories = append(all.Categories, r.data.Categories...)
+				if r.data.Container != nil {
+					all.Container = r.data.Container
+				}
 			}
 		}
 		s.update(func() {
@@ -99,6 +103,13 @@ func (s *app) browse(kind, source, id string) {
 			s.checked = map[string]bool{}
 			s.list = ui.ListState{}
 			s.status = strings.Join(errs, "；")
+			if all.Container != nil {
+				s.currentCollection = all.Container
+				s.collectionTitle = all.Container.Name
+				s.collectionKind = all.Container.Kind
+				s.collectionID = all.Container.ID
+				s.searchKind = all.Container.Kind
+			}
 			if len(all.Tracks)+len(all.Collections)+len(all.Categories) == 0 && s.status == "" {
 				s.status = "没有找到结果"
 			}
@@ -109,6 +120,7 @@ func (s *app) browse(kind, source, id string) {
 func (s *app) openCollection(c library.Collection) {
 	s.browse(c.Kind, c.Source, c.ID)
 	s.collectionTitle = c.Name
+	s.currentCollection = &c
 }
 func (s *app) localMusic() {
 	s.query = ""

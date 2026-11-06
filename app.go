@@ -25,41 +25,50 @@ import (
 )
 
 type app struct {
-	mascotAlternate                               bool
-	queueOpen, playerVolumeOpen, speedOpen        bool
-	speed                                         float64
-	queryFocused                                  bool
-	captureShortcut                               string
-	songMenu                                      string
-	songMenuOpen, toolsOpen                       bool
-	miniVolumeOpen                                bool
-	selected                                      map[string]bool
-	searchKind                                    string
-	collections                                   []library.Collection
-	categories                                    []model.PlaylistCategory
-	collectionTitle, collectionKind, collectionID string
-	scroll                                        ui.ScrollState
-	modal, settingsTab, playlistName              string
-	localPlaylistID                               string
-	pendingTracks                                 []library.Track
-	pageNumber                                    int
-	batch                                         bool
-	checked                                       map[string]bool
-	images                                        map[string]*ui.Bitmap
-	imagePending                                  map[string]bool
-	imageSlots                                    chan struct{}
-	downloads                                     *download.Queue
-	jobs                                          []download.Job
-	loginID                                       uint64
-	loginCancel                                   context.CancelFunc
-	loginSource, loginStatus                      string
-	loginImage                                    *ui.Bitmap
-	playerExpanded, lyricOpen, sourceCollapsed    bool
-	lyricScroll                                   ui.ScrollState
-	lastLyric                                     int
-	searchCancel                                  context.CancelFunc
-	sortMode                                      string
-	sortReverse                                   bool
+	previewInfo                                                       ui.Rect
+	visualEpoch                                                       time.Time
+	discAngle                                                         float64
+	discFrame                                                         time.Time
+	previewCover                                                      []byte
+	previewLyrics                                                     string
+	currentCollection                                                 *library.Collection
+	editPlaylistID, playlistDescription, playlistCover, playlistError string
+	importLink                                                        string
+	importBusy                                                        bool
+	queueOpen, playerVolumeOpen, speedOpen                            bool
+	speed                                                             float64
+	queryFocused                                                      bool
+	captureShortcut                                                   string
+	songMenu                                                          string
+	songMenuOpen, toolsOpen                                           bool
+	miniVolumeOpen                                                    bool
+	selected                                                          map[string]bool
+	searchKind                                                        string
+	collections                                                       []library.Collection
+	categories                                                        []model.PlaylistCategory
+	collectionTitle, collectionKind, collectionID                     string
+	scroll                                                            ui.ScrollState
+	modal, settingsTab, playlistName                                  string
+	localPlaylistID                                                   string
+	pendingTracks                                                     []library.Track
+	pageNumber                                                        int
+	batch                                                             bool
+	checked                                                           map[string]bool
+	images                                                            map[string]*ui.Bitmap
+	imagePending                                                      map[string]bool
+	imageSlots                                                        chan struct{}
+	downloads                                                         *download.Queue
+	jobs                                                              []download.Job
+	loginID                                                           uint64
+	loginCancel                                                       context.CancelFunc
+	loginSource, loginStatus                                          string
+	loginImage                                                        *ui.Bitmap
+	playerExpanded, lyricOpen, sourceCollapsed                        bool
+	lyricScroll                                                       ui.ScrollState
+	lastLyric                                                         int
+	searchCancel                                                      context.CancelFunc
+	sortMode                                                          string
+	sortReverse                                                       bool
 
 	ctx                         context.Context
 	cfg                         library.Config
@@ -100,7 +109,7 @@ func (s *app) ready() {
 	audio.SetLatency(audio.LatencyPlayback)
 	s.downloads = download.New(s.ctx, filepath.Join(filepath.Dir(s.configPath), "downloads.json"))
 	s.win = mygo.NewWindow(mygo.WindowOptions{Title: "music-dl", Width: 1200, Height: 820, MinWidth: 940, MinHeight: 620, StateKey: "main", Content: ui.View(s.view)})
-	s.mini = mygo.NewWindow(mygo.WindowOptions{Title: "MusicDL Mini", Width: 304, Height: 50, MinWidth: 304, MaxWidth: 304, MinHeight: 50, MaxHeight: 50, Frameless: true, AlwaysOnTop: true, SkipTaskbar: true, DisableResize: true, DisableMaximize: true, DisableFullScreen: true, StateKey: "mini", Content: ui.View(s.miniView)})
+	s.mini = mygo.NewWindow(mygo.WindowOptions{Title: "MusicDL Mini", Width: 236, Height: 50, MinWidth: 236, MaxWidth: 236, MinHeight: 50, MaxHeight: 50, Frameless: true, AlwaysOnTop: true, SkipTaskbar: true, DisableResize: true, DisableMaximize: true, DisableFullScreen: true, StateKey: "mini", Content: ui.View(s.miniView)})
 	s.mini.OnClose(func(e *mygo.CloseEvent) {
 		if !s.quitting {
 			e.PreventDefault()
@@ -132,11 +141,13 @@ func (s *app) ready() {
 		s.tray.OnClick(func() { s.win.Show(); s.win.Focus() })
 		s.tray.OnRightClick(func() { s.tray.SetMenu(menu); defer s.tray.SetMenu(nil); s.tray.PopUpMenu() })
 	}
-	mygo.App.SetMenu(mygo.NewMenu([]*mygo.MenuItem{{Role: mygo.RoleAppMenu}, {Role: mygo.RoleEditMenu}, {Label: "播放器", Submenu: []*mygo.MenuItem{
-		{Label: "播放 / 暂停", Accelerator: "CmdOrCtrl+Shift+P", Click: func(*mygo.MenuItem, *mygo.Window) { s.toggle() }},
-		{Label: "悬浮窗", Click: func(*mygo.MenuItem, *mygo.Window) { s.toggleMini() }},
-		{Label: "检查更新", Click: func(*mygo.MenuItem, *mygo.Window) { s.checkUpdate() }},
-	}}}))
+	if runtime.GOOS == "darwin" {
+		mygo.App.SetMenu(mygo.NewMenu([]*mygo.MenuItem{{Role: mygo.RoleAppMenu}, {Role: mygo.RoleEditMenu}, {Label: "播放器", Submenu: []*mygo.MenuItem{
+			{Label: "播放 / 暂停", Accelerator: "CmdOrCtrl+Shift+P", Click: func(*mygo.MenuItem, *mygo.Window) { s.toggle() }},
+			{Label: "悬浮窗", Click: func(*mygo.MenuItem, *mygo.Window) { s.toggleMini() }},
+			{Label: "检查更新", Click: func(*mygo.MenuItem, *mygo.Window) { s.checkUpdate() }},
+		}}}))
+	}
 	mygo.NowPlaying.OnCommand(func(cmd mygo.MediaCommand, pos time.Duration) {
 		switch cmd {
 		case mygo.MediaPlay:
@@ -235,6 +246,8 @@ func (s *app) play(index int, tracks []library.Track) {
 	if index < 0 || index >= len(tracks) {
 		return
 	}
+	s.previewCover = nil
+	s.previewLyrics = ""
 	s.stop()
 	s.playID++
 	id := s.playID
@@ -335,8 +348,11 @@ func (s *app) play(index int, tracks []library.Track) {
 			if id != s.playID {
 				return
 			}
-			s.lines = lyrics.Parse(lyric)
-			if len(cover) > 0 {
+			if s.previewLyrics == "" {
+				s.lines = lyrics.Parse(lyric)
+				s.lastLyric = -1
+			}
+			if len(cover) > 0 && len(s.previewCover) == 0 {
 				s.cover, _ = ui.DecodeBitmap(cover)
 			}
 			mygo.NowPlaying.Set(mygo.NowPlayingInfo{Title: track.Name, Artist: track.Artist, Album: track.Album, Artwork: cover, Duration: s.duration, Commands: mygo.MediaPlay | mygo.MediaPause | mygo.MediaNext | mygo.MediaPrevious | mygo.MediaSeek})

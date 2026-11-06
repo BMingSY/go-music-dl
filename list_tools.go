@@ -18,7 +18,7 @@ func (s *app) listTools(c *ui.Context) {
 		s.toolsOpen = !s.toolsOpen
 	}
 	ui.PopoverBase(c, button, &s.toolsOpen, func(panel ui.Element) {
-		panel.AttachTo(button, ui.AnchorBottomRight, ui.AnchorTopRight).Width(312).Margin(8, 0, 0, 0).Padding(12).Border(1, ui.Hex("#d9eee5")).Radius(14).Background(white.Alpha(.98)).Shadow(0, 18, 42, 0, ui.RGBA(15, 23, 42, .16))
+		panel.Transition(panelTransition).AttachTo(button, ui.AnchorBottomRight, ui.AnchorTopRight).Width(312).Margin(8, 0, 0, 0).Padding(12).Border(1, ui.Hex("#d9eee5")).Radius(14).Background(white.Alpha(.98)).Shadow(0, 18, 42, 0, ui.RGBA(15, 23, 42, .16))
 		ui.Row(c).Padding(1, 2, 10, 2).AlignItems(ui.Center).Children(func() {
 			ui.Text(c, "列表工具").FontSize(13).FontWeight(800).Grow(1)
 			ui.Text(c, "显示与操作").FontSize(11).FontWeight(600).TextColor(ui.Hex("#94a3b8"))

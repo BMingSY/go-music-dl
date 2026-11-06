@@ -99,6 +99,7 @@ func (s *app) exportVideo() {
 		return
 	}
 	t, cfg := *s.current, s.cfg
+	lyricOverride, coverOverride := s.previewLyrics, append([]byte(nil), s.previewCover...)
 	go func() {
 		path, err := mygo.Dialog.Save(mygo.SaveDialogOptions{Parent: s.win, Title: "导出歌词视频", DefaultPath: t.Name + ".mp4"})
 		if err != nil || path == "" {
@@ -120,6 +121,12 @@ func (s *app) exportVideo() {
 			}
 			if err == nil {
 				lyric, cover := library.Metadata(ctx, t, cfg)
+				if lyricOverride != "" {
+					lyric = lyricOverride
+				}
+				if len(coverOverride) > 0 {
+					cover = coverOverride
+				}
 				err = playback.ExportVideo(ctx, ffmpeg, audioPath, path, t.Name, t.Artist, lyric, cover)
 			}
 		}

@@ -216,7 +216,6 @@ func (s *app) generalSettings(c *ui.Context) {
 			ui.Button(c, "浏览文件夹").OnClick(s.pickFolder)
 		})
 	})
-	settingToggle(c, &s.cfg.ShowMascot, "显示桌面挂件", "")
 	ui.Button(c, "").Label("关于 music-dl").Padding(12).Radius(10).Background(ui.Hex("#f8fafc")).Border(1, border).OnClick(func() { s.modal = "about" }).Children(func() { sectionHeading(c, "info", "关于 music-dl", "查看当前版本并检查更新") })
 }
 

@@ -44,13 +44,14 @@ func (p *process) stop() {
 }
 
 type Decoder struct {
-	mu      sync.Mutex
-	input   Input
-	ffmpeg  string
-	proc    *process
-	closed  bool
-	lastErr error
-	buf     []byte // used only by MyGo's decoder goroutine
+	analysis analyzer
+	mu       sync.Mutex
+	input    Input
+	ffmpeg   string
+	proc     *process
+	closed   bool
+	lastErr  error
+	buf      []byte // used only by MyGo's decoder goroutine
 }
 
 func FindFFmpeg(configured string) (string, error) {
@@ -180,6 +181,7 @@ func (d *Decoder) SetPosition(frame int64) error {
 	// registered, so cancellation cannot leave a child running after it returns.
 	p, err := d.start(max(0, frame))
 	d.proc = p
+	d.analysis.reset(p, max(0, frame))
 	d.lastErr = err
 	d.mu.Unlock()
 	return err
@@ -202,6 +204,7 @@ func (d *Decoder) Read(samples []float32) (int, error) {
 	for i := 0; i < count; i++ {
 		samples[i] = math.Float32frombits(binary.LittleEndian.Uint32(buf[i*4:]))
 	}
+	d.analysis.capture(p, samples[:count])
 	if err != nil {
 		<-p.done
 		d.mu.Lock()

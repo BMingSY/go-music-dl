@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/BMingSY/go-music-dl/internal/library"
 	"github.com/egoist/mygo/ui"
-	"github.com/guohuiyuan/music-lib/model"
 )
 
 var accent = ui.Hex("#10b981")
@@ -18,7 +19,7 @@ var border = ui.Hex("#e2e8f0")
 
 func desktopFont() string {
 	if runtime.GOOS == "windows" {
-		return "Segoe UI, Microsoft YaHei, Meiryo, Segoe UI Emoji"
+		return "Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif"
 	}
 	return "system-ui"
 }
@@ -34,14 +35,21 @@ func (s *app) view(c *ui.Context) {
 	theme.Font = desktopFont()
 	c.SetTheme(theme)
 	w, h := c.Size()
-	ui.Box(c).Fill().Background(ui.Hex("#eef2f5")).Draw(func(p *ui.Painter, r ui.Rect) {
+	ui.Box(c).Fill().Lang("zh-CN").Background(ui.Hex("#eef2f5")).Draw(func(p *ui.Painter, r ui.Rect) {
 		r.H = 600
 		p.Image(pageBackdrop(int(r.W)), r, ui.Contain)
 	}).Children(func() {
+		if s.lyricOpen {
+			s.queryFocused = false
+			s.lyricsView(c)
+			return
+		}
 		ui.Scroll(c.Key("page-scroll")).Fill().TrackScroll(&s.scroll).Children(func() {
-			ui.Column(c).Width(min(900, w-80)).AlignSelf(ui.Center).Padding(40, 0, 150, 0).Children(func() {
+			ui.Column(c).Width(min(900, w-40)).AlignSelf(ui.Center).Padding(40, 0, 150, 0).Children(func() {
 				s.searchBox(c)
-				if len(s.categories) > 0 {
+				if s.page == "playlists" {
+					s.localPlaylistsView(c)
+				} else if len(s.categories) > 0 {
 					s.categoriesView(c)
 				} else if len(s.collections) > 0 {
 					s.collectionsView(c)
@@ -51,13 +59,7 @@ func (s *app) view(c *ui.Context) {
 			})
 		})
 		s.toolbar(c, h)
-		if s.cfg.ShowMascot && w > 768 && mascot != nil {
-			s.mascotView(c)
-		}
 		s.playerView(c)
-		if s.lyricOpen {
-			s.lyricsView(c)
-		}
 		if s.modal != "" {
 			s.modalView(c, w, h)
 		}
@@ -76,20 +78,45 @@ func (s *app) searchBox(c *ui.Context) {
 				if s.searchKind == o.id {
 					color = accent
 				}
-				ui.Radio(c.Key(o.id), &s.searchKind, o.id, o.label).FontSize(16).FontWeight(600).TextColor(color)
+				ui.RadioBase(c.Key(o.id), &s.searchKind, o.id).Label(o.label).Gap(8).AlignItems(ui.Center).Children(func() {
+					bg, bd := white, ui.Hex("#a0aec0")
+					if s.searchKind == o.id {
+						bg = accent
+						bd = accent
+					}
+					ui.Box(c).Size(13, 13).Radius(7).Border(1, bd).Background(bg).Center().Children(func() {
+						if s.searchKind == o.id {
+							ui.Box(c).Size(5, 5).Radius(3).Background(white)
+						}
+					})
+					ui.Text(c, o.label).FontSize(16).FontWeight(600).TextColor(color)
+				})
 			}
 		})
 		ui.Row(c).Gap(10).Margin(0, 0, 25, 0).Children(func() {
 			input := ui.TextInput(c.Key("query"), &s.query).Label("搜索关键词").Placeholder("输入关键词或粘贴链接，支持单曲 / 歌单 / 专辑").PlaceholderColor(ui.Hex("#757575")).Grow(1).Height(50).Padding(14, 24).Radius(50).Border(2, border).Background(ui.Hex("#f8fafc")).FontSize(16)
 			s.queryFocused = input.Focused()
+			input.Transition(ui.ElementTransition{Colors: true, Duration: 300 * time.Millisecond})
+			if input.Focused() {
+				input.Border(2, accent).Background(white).Shadow(0, 0, 0, 4, accent.Alpha(.15))
+			}
 			if input.Submitted() {
 				s.search()
 			}
-			ui.Button(c, " ").Label("搜索").Width(80).Height(50).Radius(50).Border(0, ui.Transparent).Gradient(ui.Hex("#34d399"), ui.Hex("#059669"), 135).Shadow(0, 4, 12, 0, accent.Alpha(.3)).Disabled(s.searching).OnClick(s.search).Children(func() { glyph(c, "search", 18, white) })
+			searchButton := ui.Button(c, " ").Label("搜索").Width(80).Height(50).Radius(50).Border(0, ui.Transparent).Gradient(ui.Hex("#34d399"), ui.Hex("#059669"), 135).Shadow(0, 4, 12, 0, accent.Alpha(.3)).Disabled(s.searching).OnClick(s.search)
+			buttonMotion(searchButton, 1, 2)
+			searchButton.Children(func() {
+				if s.searching {
+					glyph(c, "spinner", 18, white).Rotate(float32(math.Mod(float64(c.Now().UnixMilli())/700*360, 360)))
+					c.After(33 * time.Millisecond)
+				} else {
+					glyph(c, "search", 18, white)
+				}
+			})
 		})
 		ui.Row(c).Wrap().Justify(ui.Center).Gap(15).Margin(0, 0, 20, 0).Children(func() {
 			pill(c, "fire", "每日推荐歌单", "#ff9a9e", "#fecfef", func() { s.browse("recommend", "netease", "") })
-			pill(c, "folder", "本地歌单", "#f68084", "#f68084", func() { s.modal = "collections" })
+			pill(c, "folder", "本地歌单", "#f68084", "#f68084", s.openSavedPlaylists)
 			pill(c, "music", "本地音乐", "#f68084", "#f68084", s.localMusic)
 			pill(c, "grid", "歌单分类", "#38bdf8", "#6366f1", func() { s.browse("categories", "netease", "") })
 			pill(c, "ranking", "排行榜", "#fb923c", "#ef4444", func() { s.browse("ranks", "netease", "") })
@@ -194,9 +221,9 @@ func (s *app) resultsView(c *ui.Context) {
 			ui.Button(c, "上传文件").FontSize(12).MarginX(4).Radius(8).OnClick(s.pickLocalFiles)
 			ui.Button(c, "上传文件夹").FontSize(12).MarginX(4).Radius(8).OnClick(s.pickFolder)
 		}
-		if s.collectionTitle != "" {
+		if s.currentCollection != nil {
 			ui.Button(c, "下载整个歌单").Radius(18).TextColor(accent).FontSize(12).OnClick(func() { s.addDownloads(tracks) })
-			ui.Button(c, "导入本地").Radius(18).TextColor(accent).FontSize(12).OnClick(func() { s.pendingTracks = tracks; s.playlistName = s.collectionTitle; s.modal = "collections" })
+			ui.Button(c, "导入本地").Radius(18).TextColor(accent).FontSize(12).OnClick(func() { s.importCollection(*s.currentCollection, tracks) })
 		}
 		s.listTools(c)
 	})
@@ -237,6 +264,9 @@ func (s *app) trackCard(c *ui.Context, t library.Track, i int, tracks []library.
 	row := ui.Row(c.Key(t.Key())).MinHeight(112).Padding(15).AlignItems(ui.Center).Background(bg).Border(2, bd).Radius(16).Shadow(0, 4, 6, 0, ui.RGBA(0, 0, 0, .05))
 	if active {
 		row.Shadow(0, 8, 20, 0, accent.Alpha(.25))
+		row.AnimatePose(ui.Pose{Scale: 1.01}, hoverAnimation)
+	} else {
+		cardMotion(row, 3)
 	}
 	row.Children(func() {
 		if s.batch {
@@ -342,7 +372,7 @@ func (s *app) trackCard(c *ui.Context, t library.Track, i int, tracks []library.
 			}
 			if s.songMenu == t.Key() {
 				ui.PopoverBase(c, more, &s.songMenuOpen, func(panel ui.Element) {
-					panel.AttachTo(more, ui.AnchorBottomRight, ui.AnchorTopRight).Margin(8, 0, 0, 0).Padding(8).Border(1, border).Radius(13).Background(white.Alpha(.98)).Shadow(0, 12, 30, 0, ui.RGBA(15, 23, 42, .18))
+					panel.Transition(panelTransition).AttachTo(more, ui.AnchorBottomRight, ui.AnchorTopRight).Margin(8, 0, 0, 0).Padding(8).Border(1, border).Radius(13).Background(white.Alpha(.98)).Shadow(0, 12, 30, 0, ui.RGBA(15, 23, 42, .18))
 					ui.Grid(c).Columns(2).Gap(7).Children(func() {
 						if t.Source != "local" {
 							iconButton(c, "download", "download", "下载 "+t.Name, 36).Border(1, border).OnClick(func() { s.songMenuOpen = false; s.addDownloads([]library.Track{t}) })
@@ -367,14 +397,31 @@ func (s *app) trackCover(c *ui.Context, t library.Track, size float32) {
 	}
 }
 func (s *app) collectionsView(c *ui.Context) {
-	ui.Grid(c).Columns(4).Gap(20).Children(func() {
+	width, _ := c.Size()
+	contentWidth := min(900, width-40)
+	cols := max(1, int((contentWidth+20)/200))
+	size := (contentWidth - float32(cols-1)*20) / float32(cols)
+	ui.Row(c).Padding(10, 12).Margin(0, 0, 15, 0).Background(white.Alpha(.85)).Border(1, ui.Hex("#edf2f7")).Radius(12).Children(func() {
+		glyph(c, "list", 14, textColor).Margin(0, 8, 0, 0)
+		ui.Text(c, fmt.Sprintf("找到 %d 个歌单", len(s.collections))).FontSize(14).Bold()
+	})
+	ui.Grid(c).Columns(cols).Gap(20).Children(func() {
 		for _, p := range s.collections {
-			ui.Column(c.Key(p.Source+":"+p.ID)).Background(white).Radius(16).Clip().Shadow(0, 4, 6, 0, ui.RGBA(0, 0, 0, .05)).OnClick(func() { s.openCollection(p) }).Children(func() {
-				s.trackCover(c, library.Track{Song: model.Song{Source: p.Source, ID: p.ID, Cover: p.Cover}}, 205)
+			card := ui.Column(c.Key(p.Source+":"+p.ID)).Background(white).Radius(16).Clip().Shadow(0, 4, 6, 0, ui.RGBA(0, 0, 0, .05))
+			cardMotion(card, 5)
+			card.Children(func() {
+				ui.Box(c).OnClick(func() { s.openCollection(p) }).Children(func() {
+					s.playlistCoverView(c, p.Name, p.Cover, p.ID, size)
+					ui.Text(c, p.Source).Absolute().Right(5).Top(5).FontSize(10).TextColor(accent).Background(ui.Hex("#e6fffa")).Radius(4).Padding(2, 8)
+				})
 				ui.Column(c).Padding(12).Gap(6).Children(func() {
-					ui.Text(c, p.Name).FontSize(14).Bold().MaxLines(2)
+					ui.Text(c, p.Name).FontSize(14).Bold().MaxLines(2).OnClick(func() { s.openCollection(p) })
 					ui.Text(c, p.Creator).FontSize(12).TextColor(muted).SingleLine().Ellipsis("…")
-					ui.Text(c, fmt.Sprintf("%d 首歌曲", p.TrackCount)).FontSize(11).TextColor(muted)
+					ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
+						ui.Text(c, fmt.Sprintf("共 %d 首", p.TrackCount)).FontSize(11).TextColor(ui.Hex("#a0aec0")).Grow(1)
+						ui.Button(c, "导入本地").FontSize(12).TextColor(accent).Disabled(s.importBusy).OnClick(func() { s.importRemoteCollection(p) })
+					})
+					ui.Button(c, "下载整个歌单").FillWidth().Height(32).FontSize(12).Radius(20).TextColor(accent).Border(1, ui.Hex("#b7ebd6")).Background(ui.Hex("#f0fff9")).OnClick(func() { s.downloadRemoteCollection(p) })
 				})
 			})
 		}
@@ -396,7 +443,8 @@ func (s *app) toolbar(c *ui.Context, h float32) {
 			key, icon, label string
 			fn               func()
 		}{{"settings", "gear", "系统设置", func() { s.modal = "settings" }}, {"local", "folder", "本地音乐", s.localMusic}, {"downloads", "history", "下载管理", func() { s.modal = "downloads" }}, {"history", "clock", "播放历史", func() { s.page = "history"; s.collections = nil; s.categories = nil; s.pageNumber = 1 }}, {"mini", "mini", "悬浮窗", s.toggleMini}} {
-			iconButton(c, b.key, b.icon, b.label, 36).Shadow(0, 2, 8, 0, ui.RGBA(0, 0, 0, .12)).OnClick(b.fn)
+			button := iconButton(c, b.key, b.icon, b.label, 36).Shadow(0, 2, 8, 0, ui.RGBA(0, 0, 0, .12)).OnClick(b.fn)
+			buttonMotion(button, 1.1, 0)
 		}
 		ui.Divider(c).Width(20).MarginY(4)
 		iconButton(c, "top", "up", "回到顶部", 36).OnClick(func() { s.scroll.ScrollTo(0, 0, ui.Smooth) })

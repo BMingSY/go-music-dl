@@ -11,9 +11,15 @@ import (
 )
 
 type Playlist struct {
-	ID     string  `json:"id"`
-	Name   string  `json:"name"`
-	Tracks []Track `json:"tracks"`
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Tracks      []Track `json:"tracks"`
+	Description string  `json:"description,omitempty"`
+	Cover       string  `json:"cover,omitempty"`
+	Source      string  `json:"source,omitempty"`
+	ExternalID  string  `json:"external_id,omitempty"`
+	Kind        string  `json:"kind,omitempty"`
+	Link        string  `json:"link,omitempty"`
 }
 type Collection struct {
 	model.Playlist
@@ -23,6 +29,7 @@ type Catalog struct {
 	Tracks      []Track
 	Collections []Collection
 	Categories  []model.PlaylistCategory
+	Container   *Collection
 }
 type collectionProvider interface {
 	SearchPlaylist(string) ([]model.Playlist, error)
@@ -38,9 +45,7 @@ func Browse(ctx context.Context, source, kind, query, id string, page int, cfg C
 		return result, err
 	}
 	if kind == "song" {
-		tracks, err := Search(ctx, source, query, cfg)
-		result.Tracks = tracks
-		return result, err
+		return searchCatalog(ctx, source, query, cfg)
 	}
 	p, err := provider(source, cfg)
 	if err != nil {
@@ -54,7 +59,11 @@ func Browse(ctx context.Context, source, kind, query, id string, page int, cfg C
 		if id != "" {
 			songs, err = cp.GetPlaylistSongs(id)
 		} else if isURL(query) {
-			_, songs, err = cp.ParsePlaylist(query)
+			var meta *model.Playlist
+			meta, songs, err = cp.ParsePlaylist(query)
+			if meta != nil {
+				result.Container = &Collection{Playlist: *meta, Kind: "playlist"}
+			}
 		} else {
 			lists, err = cp.SearchPlaylist(query)
 		}
@@ -66,7 +75,11 @@ func Browse(ctx context.Context, source, kind, query, id string, page int, cfg C
 		if id != "" {
 			songs, err = n.GetAlbumSongs(id)
 		} else if isURL(query) {
-			_, songs, err = n.ParseAlbum(query)
+			var meta *model.Playlist
+			meta, songs, err = n.ParseAlbum(query)
+			if meta != nil {
+				result.Container = &Collection{Playlist: *meta, Kind: "album"}
+			}
 		} else {
 			lists, err = n.SearchAlbum(query)
 		}
