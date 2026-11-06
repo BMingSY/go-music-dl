@@ -1,0 +1,104 @@
+name: Desktop
+on:
+  pull_request:
+    branches: [custom]
+  push:
+    branches: [custom]
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    name: Desktop (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            target: windows-amd64
+            platform: windows/amd64
+          - runner: macos-26
+            target: darwin-arm64
+            platform: darwin/arm64
+          - runner: macos-15-intel
+            target: darwin-amd64
+            platform: darwin/amd64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/music-dl/build
+            ~/Library/Caches/music-dl/build
+            ~/AppData/Local/music-dl/build
+          key: ffmpeg-${{ matrix.target }}-${{ hashFiles('tools/bundle-ffmpeg/main.go') }}
+      - name: Bundle audio tools
+        run: |
+          go run ./tools/bundle-ffmpeg -platform '${{ matrix.target }}'
+          echo "$PWD/resources/${{ matrix.target }}" >> "$GITHUB_PATH"
+      - name: Verify
+        env:
+          MUSIC_DL_REQUIRE_AUDIO_TESTS: '1'
+        run: |
+          go vet ./...
+          go test -race -timeout=180s ./...
+          go run ./tools/test-update
+      - name: Build desktop package
+        env:
+          CGO_ENABLED: '0'
+          MYGO_UPDATER_PRIVATE_KEY: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.MYGO_UPDATER_PRIVATE_KEY || '' }}
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            test -n "$MYGO_UPDATER_PRIVATE_KEY"
+            python3 -c 'import json,os; c=json.load(open("mygo.json")); assert "v"+c["version"] == os.environ["GITHUB_REF_NAME"], "Tag must match mygo.json version"'
+          fi
+          go run github.com/egoist/mygo/cmd/mygo@v0.7.4 build -platform '${{ matrix.platform }}'
+      - name: Render UI and run native window smoke
+        env:
+          MUSIC_DL_PREVIEW_DIR: artifacts/render
+        run: |
+          go test -run TestRenderPreview -count=1 .
+          mkdir -p artifacts/smoke
+          if [[ "$RUNNER_OS" == macOS ]]; then
+            app_binary=$(find dist -path '*.app/Contents/MacOS/*' -type f | head -1)
+            "$app_binary" --smoke-test "$PWD/artifacts/smoke"
+            test -f artifacts/smoke/result.txt
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: music-dl-${{ matrix.target }}
+          path: |
+            dist/
+            artifacts/
+          retention-days: 14
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: packages
+          pattern: music-dl-*
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mapfile -d '' files < <(find packages -type f \( -name '*-setup-*.exe' -o -name '*.dmg' -o -name '*.tar.gz' -o -name 'update-*.json' \) -print0)
+          test "${#files[@]}" -ge 9
+          gh release create "$GITHUB_REF_NAME" "${files[@]}" --repo "$GITHUB_REPOSITORY" --title "music-dl $GITHUB_REF_NAME" --generate-notes

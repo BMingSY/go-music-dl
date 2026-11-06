@@ -1,0 +1,27 @@
+{
+  "name": "music-dl",
+  "slug": "music-dl",
+  "identifier": "io.github.bmingsy.musicdl",
+  "version": "1.0.0",
+  "out": "dist",
+  "windows": {
+    "displayName": "music-dl",
+    "installDirName": "MusicDL"
+  },
+  "linux": {
+    "webview": false
+  },
+  "icon": "assets/icon.png",
+  "macos": {
+    "minimumSystemVersion": "13.0"
+  },
+  "updates": {
+    "publicKey": "qnBuFNn1DPNOIXgydBuuBP1R6GTO13QnpAkpld4zTOw=",
+    "github": "BMingSY/go-music-dl",
+    "deltas": 0
+  },
+  "resources": [
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md"
+  ]
+}
