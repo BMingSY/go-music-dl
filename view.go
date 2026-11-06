@@ -19,7 +19,7 @@ var border = ui.Hex("#e2e8f0")
 
 func desktopFont() string {
 	if runtime.GOOS == "windows" {
-		return "Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif"
+		return "Segoe UI, Roboto, Helvetica Neue, Arial, Microsoft YaHei, sans-serif"
 	}
 	return "system-ui"
 }
@@ -422,7 +422,7 @@ func (s *app) toolbar(c *ui.Context, h float32) {
 		for _, b := range []struct {
 			key, icon, label string
 			fn               func()
-		}{{"settings", "gear", "系统设置", func() { s.modal = "settings" }}, {"local", "folder", "本地音乐", s.localMusic}, {"downloads", "history", "下载管理", func() { s.modal = "downloads" }}, {"history", "clock", "播放历史", func() { s.page = "history"; s.collections = nil; s.categories = nil; s.pageNumber = 1 }}, {"mini", "mini", "悬浮窗", s.toggleMini}} {
+		}{{"settings", "gear", "系统设置", func() { s.modal = "settings" }}, {"local", "folder", "本地音乐", s.localMusic}, {"downloads", "history", "下载管理", func() { s.modal = "downloads" }}, {"history", "clock", "播放历史", func() { s.modal = "history"; s.utilityPage = 1 }}, {"mini", "mini", "悬浮窗", s.toggleMini}} {
 			button := iconButton(c, b.key, b.icon, b.label, 36).Shadow(0, 2, 8, 0, ui.RGBA(0, 0, 0, .12)).OnClick(b.fn)
 			buttonMotion(button, 1.1, 0)
 		}

@@ -179,6 +179,7 @@ func (s *app) shownTracks() []library.Track {
 	return tracks
 }
 func (s *app) recordHistory(t library.Track) {
+	t.PlayedAt = time.Now().Unix()
 	history := []library.Track{t}
 	for _, old := range s.cfg.History {
 		if old.Key() != t.Key() {

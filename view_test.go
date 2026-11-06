@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/BMingSY/go-music-dl/internal/download"
 	"github.com/BMingSY/go-music-dl/internal/library"
 	"github.com/BMingSY/go-music-dl/internal/lyrics"
 	"github.com/egoist/mygo/ui"
@@ -187,7 +188,7 @@ func TestRenderPreview(t *testing.T) {
 		s.position = 63 * time.Second
 		s.duration = time.Duration(s.current.Duration) * time.Second
 	}
-	for _, name := range []string{"main", "main-playing", "song-menu", "list-tools", "player", "settings", "mini", "mini-paused", "mini-hover", "lyrics", "playlists", "playlist-editor", "collection-picker", "categories", "rankings", "recommend"} {
+	for _, name := range []string{"main", "main-playing", "song-menu", "list-tools", "player", "settings", "mini", "mini-paused", "mini-hover", "lyrics", "playlists", "playlist-editor", "collection-picker", "categories", "rankings", "recommend", "history", "downloads", "download-history"} {
 		s.playing = name != "main" && name != "song-menu" && name != "mini-paused"
 		s.modal = ""
 		s.toolsOpen, s.songMenuOpen, s.lyricOpen = false, false, false
@@ -237,6 +238,19 @@ func TestRenderPreview(t *testing.T) {
 			for i, title := range []string{"飙升榜", "新歌榜", "原创榜", "热歌榜"} {
 				s.collections = append(s.collections, library.Collection{Playlist: model.Playlist{ID: fmt.Sprint(i), Source: "netease", Name: title, TrackCount: 100, PlayCount: 2380000, Extra: map[string]string{"update_frequency": "每天更新"}}, Kind: "rank"})
 			}
+		}
+
+		if name == "history" {
+			s.modal = "history"
+			s.cfg.History = append([]library.Track(nil), s.results...)
+		}
+		if name == "downloads" || name == "download-history" {
+			s.modal = "downloads"
+			s.downloadTab = ""
+			if name == "download-history" {
+				s.downloadTab = "history"
+			}
+			s.jobs = []download.Job{{Track: s.results[0], State: "downloading", Done: 1500000, Total: 5000000}, {Track: s.results[1], State: "done", Done: 3000000, Total: 3000000}, {Track: s.results[2], State: "queued"}}
 		}
 
 		tt := ui.NewTester(view, w, h)

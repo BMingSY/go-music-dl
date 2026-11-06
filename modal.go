@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"slices"
 
 	"github.com/BMingSY/go-music-dl/internal/library"
@@ -10,6 +9,10 @@ import (
 )
 
 func (s *app) modalView(c *ui.Context, w, h float32) {
+	if s.modal == "history" || s.modal == "downloads" {
+		s.utilityModal(c, w, h)
+		return
+	}
 	titles := map[string]string{"settings": "系统设置", "collections": "本地歌单", "login": "扫码登录", "downloads": "下载管理", "about": "关于 music-dl"}
 	titles["collections"] = "收藏到我的歌单"
 	titles["edit-playlist"] = "新建歌单"
@@ -18,6 +21,10 @@ func (s *app) modalView(c *ui.Context, w, h float32) {
 	}
 	titles["import-playlist"] = "导入歌单"
 	width, height := float32(640), min(h-40, 600)
+	if s.modal == "about" {
+		width = 420
+		height = min(h-40, 310)
+	}
 	if s.modal == "settings" {
 		width = 760
 		height = min(h-40, 720)
@@ -218,50 +225,6 @@ func (s *app) loginView(c *ui.Context) {
 		}
 		ui.Text(c, s.loginStatus).FontSize(14).MaxLines(2)
 		ui.Button(c, "重新获取二维码").OnClick(func() { s.startLogin(s.loginSource) })
-	})
-}
-func (s *app) downloadsView(c *ui.Context) {
-	labels := map[string]string{"queued": "等待下载", "downloading": "正在下载", "done": "下载完成", "failed": "下载失败", "canceled": "已取消"}
-	ui.Row(c).Gap(8).Children(func() {
-		ui.Button(c, "打开下载目录").OnClick(s.openDownloadDir)
-		ui.Button(c, "清理已结束记录").OnClick(func() {
-			if s.downloads != nil {
-				s.downloads.Clear()
-				s.jobs = s.downloads.Snapshot()
-			}
-		})
-	})
-	ui.Scroll(c).Grow(1).Children(func() {
-		ui.Column(c).Gap(10).Children(func() {
-			for _, j := range s.jobs {
-				ui.Column(c.Key(j.Track.Key())).Padding(12).Border(1, border).Radius(10).Gap(8).Children(func() {
-					ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
-						ui.Column(c).Grow(1).Gap(4).Children(func() {
-							ui.Text(c, j.Track.Name).FontSize(14).Bold().SingleLine().Ellipsis("…")
-							ui.Text(c, labels[j.State]+"  "+j.Error).FontSize(12).TextColor(muted).MaxLines(2)
-						})
-						if j.State == "queued" || j.State == "downloading" {
-							ui.Button(c, "取消").OnClick(func() { s.downloads.Cancel(j.Track.Key()) })
-						} else if j.State == "failed" || j.State == "canceled" {
-							ui.Button(c, "重试").OnClick(func() { s.addDownloads([]library.Track{j.Track}) })
-						} else if j.State == "done" {
-							ui.Button(c, "打开").OnClick(func() { mygo.Shell.ShowItemInFolder(j.Path) })
-						}
-					})
-					if j.State == "downloading" {
-						progress := float64(0)
-						if j.Total > 0 {
-							progress = float64(j.Done) / float64(j.Total)
-						}
-						ui.Box(c).Height(4).Background(border).Radius(2).Children(func() { ui.Box(c).WidthPercent(float32(progress * 100)).Height(4).Background(accent).Radius(2) })
-						ui.Text(c, fmt.Sprintf("%.1f / %.1f MB", float64(j.Done)/(1<<20), float64(max(0, j.Total))/(1<<20))).FontSize(11).TextColor(muted)
-					}
-				})
-			}
-			if len(s.jobs) == 0 {
-				ui.Text(c, "暂无下载记录").TextColor(muted).Padding(30)
-			}
-		})
 	})
 }
 func (s *app) aboutView(c *ui.Context) {

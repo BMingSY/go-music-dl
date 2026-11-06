@@ -25,6 +25,8 @@ import (
 )
 
 type app struct {
+	utilityPage                                                       int
+	downloadTab, downloadFilter                                       string
 	toastSeen                                                         string
 	toastStarted                                                      time.Time
 	previewInfo                                                       ui.Rect
@@ -110,8 +112,11 @@ func newApp(ctx context.Context, cfg library.Config, path string) *app {
 func (s *app) ready() {
 	audio.SetLatency(audio.LatencyPlayback)
 	s.downloads = download.New(s.ctx, filepath.Join(filepath.Dir(s.configPath), "downloads.json"))
+	s.downloads.Resume(s.cfg)
 	s.win = mygo.NewWindow(mygo.WindowOptions{Title: "music-dl", Width: 1200, Height: 820, MinWidth: 940, MinHeight: 620, StateKey: "main", Content: ui.View(s.view)})
 	s.mini = mygo.NewWindow(mygo.WindowOptions{Title: "MusicDL Mini", Width: 236, Height: 50, MinWidth: 236, MaxWidth: 236, MinHeight: 50, MaxHeight: 50, Frameless: true, AlwaysOnTop: true, SkipTaskbar: true, DisableResize: true, DisableMaximize: true, DisableFullScreen: true, StateKey: "mini", Content: ui.View(s.miniView)})
+	// Keep the new compact dimensions when restoring an older saved window.
+	s.mini.SetSize(236, 50)
 	s.mini.OnClose(func(e *mygo.CloseEvent) {
 		if !s.quitting {
 			e.PreventDefault()

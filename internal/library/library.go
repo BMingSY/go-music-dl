@@ -25,7 +25,8 @@ const UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 
 
 type Track struct {
 	model.Song
-	Path string `json:"path,omitempty"`
+	Path     string `json:"path,omitempty"`
+	PlayedAt int64  `json:"played_at,omitempty"`
 }
 
 func (t Track) Key() string { return t.Source + ":" + t.ID }

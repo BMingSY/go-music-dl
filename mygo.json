@@ -13,6 +13,7 @@
   },
   "icon": "assets/icon.png",
   "macos": {
+    "icon": "assets/icon.icns",
     "minimumSystemVersion": "13.0"
   },
   "updates": {

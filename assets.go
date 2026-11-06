@@ -17,7 +17,7 @@ var icons = map[string]string{
 
 func initAssets() {
 	assetsOnce.Do(func() {
-		for _, f := range []struct{ file, name string }{{"fa-solid-900.ttf", "MusicDL Icons"}, {"fa-regular-400.ttf", "MusicDL Outline"}} {
+		for _, f := range []struct{ file, name string }{{"musicdl-icons.ttf", "MusicDL Icons"}, {"musicdl-outline.ttf", "MusicDL Outline"}} {
 			b, _ := assets.ReadFile("assets/" + f.file)
 			_ = ui.RegisterFont(b, f.name)
 		}

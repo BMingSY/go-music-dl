@@ -2,7 +2,7 @@
 
 - go-music-dl / music-lib — https://github.com/guohuiyuan/go-music-dl and https://github.com/guohuiyuan/music-lib; AGPL-3.0. The original desktop design and application icon are retained.
 - MyGo — https://github.com/egoist/mygo; MIT.
-- Font Awesome Free — https://fontawesome.com; fonts under SIL OFL 1.1. Original font files are included in `assets/`.
+- Font Awesome Free — https://fontawesome.com; SIL OFL 1.1. Subsets are renamed MusicDL Icons and MusicDL Outline; the original glyph designs and license are retained. See `tools/prepare-assets.py`.
 - FFmpeg 9.0.2 — https://ffmpeg.org; LGPL 2.1 or later. Built as shared libraries from the pinned sources and build recipe in `tools/bundle-ffmpeg/`. The separate libraries may be replaced by compatible builds.
 - libass 0.17.4 — https://github.com/libass/libass; ISC.
 - FreeType 2.13.3 — https://freetype.org; FreeType License.

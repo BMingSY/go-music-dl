@@ -6,11 +6,15 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/BMingSY/go-music-dl/internal/library"
 )
 
 type Job struct {
+	Directory   string        `json:"directory,omitempty"`
+	FinishedAt  int64         `json:"finished_at,omitempty"`
+	Hidden      bool          `json:"hidden,omitempty"`
 	Track       library.Track `json:"track"`
 	State       string        `json:"state"`
 	Path        string        `json:"path,omitempty"`
@@ -35,8 +39,11 @@ func New(ctx context.Context, path string) *Queue {
 	}
 	for i := range q.jobs {
 		if q.jobs[i].State == "queued" || q.jobs[i].State == "downloading" {
-			q.jobs[i].State = "canceled"
-			q.jobs[i].Error = "上次下载已中断，可点击重试"
+			q.jobs[i].State = "queued"
+			q.jobs[i].Error = ""
+			if q.jobs[i].Hidden {
+				q.jobs[i].State = "canceled"
+			}
 		}
 	}
 	go q.run()
@@ -55,14 +62,15 @@ func (q *Queue) Add(tracks []library.Track, cfg library.Config) {
 			j := &q.jobs[i]
 			if j.Track.Key() == t.Key() {
 				found = true
+				j.Hidden = false
 				if q.current != t.Key() && (j.State == "failed" || j.State == "canceled") {
-					*j = Job{Track: t, State: "queued", Config: cfg}
+					*j = Job{Track: t, State: "queued", Config: cfg, Directory: cfg.DownloadDir}
 				}
 				break
 			}
 		}
 		if !found {
-			q.jobs = append(q.jobs, Job{Track: t, State: "queued", Config: cfg})
+			q.jobs = append(q.jobs, Job{Track: t, State: "queued", Config: cfg, Directory: cfg.DownloadDir})
 		}
 	}
 	q.persist()
@@ -171,15 +179,24 @@ func (q *Queue) run() {
 				if j.Track.Key() != key {
 					continue
 				}
-				if canceled {
+				if q.ctx.Err() != nil && !j.Hidden && j.State != "canceled" {
+					j.State = "queued"
+					j.Error = ""
+				} else if canceled {
 					j.State = "canceled"
 				} else if err != nil {
 					j.State = "failed"
 					j.Error = err.Error()
 				} else {
 					j.State = "done"
+					if j.Done == 0 && j.Total == 0 {
+						j.State = "skipped"
+					}
 					j.Path = path
 					j.Error = ""
+				}
+				if j.State != "queued" {
+					j.FinishedAt = time.Now().Unix()
 				}
 				j.Config = library.Config{}
 				break
@@ -188,4 +205,39 @@ func (q *Queue) run() {
 			q.mu.Unlock()
 		}
 	}
+}
+
+// Resume installs the current credentials only in memory before waking persisted work.
+func (q *Queue) Resume(cfg library.Config) {
+	q.mu.Lock()
+	for i := range q.jobs {
+		j := &q.jobs[i]
+		if j.State == "queued" && !j.Hidden {
+			j.Config = cfg
+			if j.Directory != "" {
+				j.Config.DownloadDir = j.Directory
+			}
+		}
+	}
+	q.persist()
+	q.mu.Unlock()
+	select {
+	case q.wake <- struct{}{}:
+	default:
+	}
+}
+
+// Clearing the visible queue keeps completed records and lets the active write finish.
+func (q *Queue) ClearPending() {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	for i := range q.jobs {
+		j := &q.jobs[i]
+		j.Hidden = true
+		if j.State == "queued" {
+			j.State = "canceled"
+			j.Error = ""
+		}
+	}
+	q.persist()
 }
