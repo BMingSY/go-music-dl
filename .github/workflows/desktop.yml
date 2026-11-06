@@ -4,7 +4,7 @@ on:
     branches: [custom]
   push:
     branches: [custom]
-    tags: ['v*']
+    tags: ['native-v*']
   workflow_dispatch:
     inputs:
       native_arm:
@@ -68,11 +68,11 @@ jobs:
       - name: Build desktop package
         env:
           CGO_ENABLED: '0'
-          MYGO_UPDATER_PRIVATE_KEY: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.MYGO_UPDATER_PRIVATE_KEY || '' }}
+          MYGO_UPDATER_PRIVATE_KEY: ${{ startsWith(github.ref, 'refs/tags/native-v') && secrets.MYGO_UPDATER_PRIVATE_KEY || '' }}
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+          if [[ "$GITHUB_REF" == refs/tags/native-v* ]]; then
             test -n "$MYGO_UPDATER_PRIVATE_KEY"
-            python3 -c 'import json,os; c=json.load(open("mygo.json")); assert "v"+c["version"] == os.environ["GITHUB_REF_NAME"], "Tag must match mygo.json version"'
+            python3 -c 'import json,os; c=json.load(open("mygo.json")); assert c["updates"]["tagPrefix"]+c["version"] == os.environ["GITHUB_REF_NAME"], "Tag must match mygo.json version"'
           fi
           go run github.com/egoist/mygo/cmd/mygo@v0.7.4 build -platform '${{ matrix.platform }}'
       - name: Render UI and run native window smoke
@@ -117,12 +117,16 @@ jobs:
           "$app_binary" --smoke-test "$PWD/artifacts/smoke"
           test -f artifacts/smoke/result.txt
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/native-v')
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
       - uses: actions/download-artifact@v4
         with:
           path: packages
@@ -131,6 +135,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          mapfile -d '' files < <(find packages -type f \( -name '*-setup-*.exe' -o -name '*.dmg' -o -name '*.tar.gz' -o -name 'update-*.json' \) -print0)
-          test "${#files[@]}" -ge 9
-          gh release create "$GITHUB_REF_NAME" "${files[@]}" --repo "$GITHUB_REPOSITORY" --title "music-dl $GITHUB_REF_NAME" --generate-notes
+          go run ./tools/verify-release packages release-assets
+          release_version="${GITHUB_REF_NAME#native-v}"
+          awk -v ver="$release_version" '/^## / {if(found) exit; if($2==ver) {found=1; next}} found' CHANGELOG.md > release-notes.md
+          test -s release-notes.md
+          gh release create "$GITHUB_REF_NAME" release-assets/* --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "music-dl $release_version" --notes-file release-notes.md
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest

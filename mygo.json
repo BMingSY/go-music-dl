@@ -2,7 +2,7 @@
   "name": "music-dl",
   "slug": "music-dl",
   "identifier": "io.github.bmingsy.musicdl",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "out": "dist",
   "windows": {
     "displayName": "music-dl",
@@ -18,6 +18,7 @@
   "updates": {
     "publicKey": "qnBuFNn1DPNOIXgydBuuBP1R6GTO13QnpAkpld4zTOw=",
     "github": "BMingSY/go-music-dl",
+    "tagPrefix": "native-v",
     "deltas": 0
   },
   "resources": [
