@@ -40,14 +40,19 @@ func (s *app) spectrumView(c *ui.Context, container, disc float32) {
 		}
 		spectrum := s.decoder.Spectrum(at)
 		cx, cy := r.X+r.W/2, r.Y+r.H/2
-		for i, value := range spectrum {
+		for i := 0; i < 180; i++ {
+			index := math.Exp(math.Log(float64(len(spectrum))*.8) * float64(i) / 180)
+			lo := min(len(spectrum)-1, int(index))
+			hi := min(len(spectrum)-1, lo+1)
+			fraction := float32(index - float64(lo))
+			value := min(1, (spectrum[lo]*(1-fraction)+spectrum[hi]*fraction)*(1+float32(i)/180*.8))
 			height := float32(2)
 			if s.playing {
-				height += float32(math.Pow(float64(value), 1.4)) * disc * .3
+				height += float32(math.Pow(float64(value), 2.5)) * 40
 			}
-			angle := float32(i) * 360 / float32(len(spectrum))
+			angle := float32(i) * 360 / 180
 			color := spectrumColor(float64(angle))
-			p.Transform(ui.Rotation(angle), cx, cy, func() { p.Fill(ui.Rect{X: cx - .75, Y: cy - disc/2 - height, W: 1.5, H: height}, color, .5) })
+			p.Transform(ui.Rotation(angle), cx, cy, func() { p.Fill(ui.Rect{X: cx - .75, Y: cy - disc/2 - 2 - height, W: 1.5, H: height}, color, .5) })
 		}
 	})
 }

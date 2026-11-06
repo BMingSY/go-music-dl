@@ -18,15 +18,15 @@ import (
 	"time"
 )
 
-type source struct{ Name, Version, URL, SHA256, License string }
+type source struct{ Name, Version, URL, SHA256, License, Mirror string }
 
 var sources = []source{
-	{"zlib", "1.3.1", "https://zlib.net/fossils/zlib-1.3.1.tar.gz", "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23", "LICENSE"},
-	{"freetype", "2.13.3", "https://download-mirror.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.xz", "0550350666d427c74daeb85d5ac7bb353acba5f76956395995311a9c6f063289", "docs/FTL.TXT"},
-	{"harfbuzz", "10.4.0", "https://github.com/harfbuzz/harfbuzz/releases/download/10.4.0/harfbuzz-10.4.0.tar.xz", "480b6d25014169300669aa1fc39fb356c142d5028324ea52b3a27648b9beaad8", "COPYING"},
-	{"fribidi", "1.0.16", "https://github.com/fribidi/fribidi/releases/download/v1.0.16/fribidi-1.0.16.tar.xz", "1b1cde5b235d40479e91be2f0e88a309e3214c8ab470ec8a2744d82a5a9ea05c", "COPYING"},
-	{"libass", "0.17.4", "https://github.com/libass/libass/releases/download/0.17.4/libass-0.17.4.tar.xz", "78f1179b838d025e9c26e8fef33f8092f65611444ffa1bfc0cfac6a33511a05a", "COPYING"},
-	{"ffmpeg", "9.0.2", "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz", "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e", "COPYING.LGPLv2.1"},
+	{"zlib", "1.3.1", "https://zlib.net/fossils/zlib-1.3.1.tar.gz", "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23", "LICENSE", ""},
+	{"freetype", "2.13.3", "https://download-mirror.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.xz", "0550350666d427c74daeb85d5ac7bb353acba5f76956395995311a9c6f063289", "docs/FTL.TXT", "https://distfiles.macports.org/freetype/freetype-2.13.3.tar.xz"},
+	{"harfbuzz", "10.4.0", "https://github.com/harfbuzz/harfbuzz/releases/download/10.4.0/harfbuzz-10.4.0.tar.xz", "480b6d25014169300669aa1fc39fb356c142d5028324ea52b3a27648b9beaad8", "COPYING", ""},
+	{"fribidi", "1.0.16", "https://github.com/fribidi/fribidi/releases/download/v1.0.16/fribidi-1.0.16.tar.xz", "1b1cde5b235d40479e91be2f0e88a309e3214c8ab470ec8a2744d82a5a9ea05c", "COPYING", ""},
+	{"libass", "0.17.4", "https://github.com/libass/libass/releases/download/0.17.4/libass-0.17.4.tar.xz", "78f1179b838d025e9c26e8fef33f8092f65611444ffa1bfc0cfac6a33511a05a", "COPYING", ""},
+	{"ffmpeg", "9.0.2", "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz", "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e", "COPYING.LGPLv2.1", ""},
 }
 
 type builder struct {
@@ -145,36 +145,25 @@ func verified(path, sum string) bool {
 func (b *builder) prepare(s source) error {
 	archive := filepath.Join(b.root, filepath.Base(s.URL))
 	if !verified(archive, s.SHA256) {
-		req, err := http.NewRequest("GET", s.URL, nil)
+		urls := []string{s.URL}
+		if s.Mirror != "" {
+			urls = append(urls, s.Mirror)
+		}
+		var err error
+		for attempt := 0; attempt < 3; attempt++ {
+			for _, url := range urls {
+				err = fetchSource(url, archive, s.SHA256)
+				if err == nil {
+					break
+				}
+				fmt.Fprintln(os.Stderr, "Source download:", err)
+			}
+			if err == nil {
+				break
+			}
+			time.Sleep(time.Duration(attempt+1) * time.Second)
+		}
 		if err != nil {
-			return err
-		}
-		req.Header.Set("User-Agent", "music-dl-build")
-		resp, err := (&http.Client{Timeout: 10 * time.Minute}).Do(req)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("%s: HTTP %d", s.Name, resp.StatusCode)
-		}
-		f, err := os.Create(archive + ".part")
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(f, io.LimitReader(resp.Body, 128<<20))
-		ce := f.Close()
-		if err != nil {
-			return err
-		}
-		if ce != nil {
-			return ce
-		}
-		if !verified(archive+".part", s.SHA256) {
-			os.Remove(archive + ".part")
-			return fmt.Errorf("%s checksum mismatch", s.Name)
-		}
-		if err = os.Rename(archive+".part", archive); err != nil {
 			return err
 		}
 	}
@@ -183,6 +172,39 @@ func (b *builder) prepare(s source) error {
 	}
 	return b.run(b.src, "tar", "xf", archive)
 }
+func fetchSource(url, path, sum string) error {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", "music-dl-build")
+	resp, err := (&http.Client{Timeout: 5 * time.Minute}).Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("%s: HTTP %d", url, resp.StatusCode)
+	}
+	f, err := os.Create(path + ".part")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(path + ".part")
+	_, err = io.Copy(f, io.LimitReader(resp.Body, 128<<20))
+	ce := f.Close()
+	if err != nil {
+		return err
+	}
+	if ce != nil {
+		return ce
+	}
+	if !verified(path+".part", sum) {
+		return fmt.Errorf("source checksum mismatch for %s", url)
+	}
+	return os.Rename(path+".part", path)
+}
+
 func (b *builder) cmake(name string, extra ...string) error {
 	dir := filepath.Join(b.work, name)
 	if _, e := os.Stat(filepath.Join(dir, ".complete")); e == nil {

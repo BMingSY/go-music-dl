@@ -7,20 +7,21 @@ import (
 	"time"
 )
 
-const fftSize = 1024
-const SpectrumBands = 128
+const fftSize = 2048
+const SpectrumBands = fftSize / 2
 
 type spectrumFrame struct {
 	at    time.Duration
 	bands [SpectrumBands]float32
 }
 type analyzer struct {
-	mu      sync.Mutex
-	source  *process
-	cursor  int64
-	samples [fftSize]float64
-	used    int
-	frames  []spectrumFrame
+	mu       sync.Mutex
+	source   *process
+	cursor   int64
+	samples  [fftSize]float64
+	used     int
+	previous [SpectrumBands]float32
+	frames   []spectrumFrame
 }
 
 func (a *analyzer) reset(p *process, frame int64) {
@@ -29,6 +30,7 @@ func (a *analyzer) reset(p *process, frame int64) {
 	a.source = p
 	a.cursor = frame
 	a.used = 0
+	a.previous = [SpectrumBands]float32{}
 	a.frames = nil
 }
 func (a *analyzer) capture(p *process, pcm []float32) {
@@ -42,7 +44,12 @@ func (a *analyzer) capture(p *process, pcm []float32) {
 		a.used++
 		a.cursor++
 		if a.used == fftSize {
-			a.frames = append(a.frames, spectrumFrame{at: time.Duration(float64(a.cursor-fftSize/2) / Rate * float64(time.Second)), bands: frequencyBands(a.samples)})
+			bands := frequencyBands(a.samples)
+			for i := range bands {
+				bands[i] = a.previous[i]*.65 + bands[i]*.35
+			}
+			a.previous = bands
+			a.frames = append(a.frames, spectrumFrame{at: time.Duration(float64(a.cursor-fftSize/2) / Rate * float64(time.Second)), bands: bands})
 			if len(a.frames) > 160 {
 				copy(a.frames, a.frames[len(a.frames)-160:])
 				a.frames = a.frames[:160]
@@ -94,12 +101,9 @@ func frequencyBands(samples [fftSize]float64) [SpectrumBands]float32 {
 	}
 	var result [SpectrumBands]float32
 	for i := range result {
-		peak := 0.0
-		for j := max(1, i*fftSize/(2*SpectrumBands)); j < (i+1)*fftSize/(2*SpectrumBands); j++ {
-			peak = max(peak, cmplx.Abs(data[j])/fftSize*4)
-		}
-		if peak > 0 {
-			result[i] = float32(max(0, min(1, (20*math.Log10(peak)+70)/70)))
+		magnitude := cmplx.Abs(data[i]) / fftSize * 2
+		if magnitude > 0 {
+			result[i] = float32(max(0, min(1, (20*math.Log10(magnitude)+100)/70)))
 		}
 	}
 	return result

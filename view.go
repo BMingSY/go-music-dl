@@ -68,9 +68,9 @@ func (s *app) view(c *ui.Context) {
 }
 func (s *app) searchBox(c *ui.Context) {
 	ui.Column(c.Key("search-box")).Background(white.Alpha(.95)).Border(1, white.Alpha(.5)).Radius(20).Padding(30).Shadow(0, 4, 6, 0, ui.RGBA(0, 0, 0, .05)).Margin(0, 0, 30, 0).Children(func() {
-		ui.Row(c).Justify(ui.Center).Gap(14).Height(45).Margin(0, 0, 25, 0).AlignItems(ui.Center).Children(func() {
-			glyph(c, "music", 35, accent)
-			ui.Text(c, "music-dl").FontSize(35.2).LetterSpacing(-1).FontWeight(800).TextColor(accent)
+		ui.Row(c).Justify(ui.Center).Gap(14).Effect(headingGradient{}).Height(45).Margin(0, 0, 25, 0).AlignItems(ui.Center).Children(func() {
+			glyph(c, "music", 35, white)
+			ui.Text(c, "music-dl").FontSize(35.2).LetterSpacing(-1).FontWeight(800).TextColor(white)
 		})
 		ui.Row(c).Justify(ui.Center).Gap(20).Height(25).Margin(0, 0, 20, 0).AlignItems(ui.Center).Children(func() {
 			for _, o := range []struct{ id, label string }{{"song", "单曲搜索"}, {"playlist", "歌单搜索"}, {"album", "专辑搜索"}} {
