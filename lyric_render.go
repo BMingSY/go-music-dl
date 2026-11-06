@@ -23,7 +23,7 @@ func (s *app) lyricWord(c *ui.Context, word lyrics.Word, size float32, position 
 			now += p.Now().Sub(frameAt)
 			p.AnimationFrameRate(30)
 		}
-		span := ui.Span{Text: word.Text, Font: s.lyricFont(), Size: size, Weight: 800, Color: white}
+		span := ui.Span{Text: word.Text, Font: s.lyricFont(), Size: size, Weight: 800, Color: white, Lang: "zh-CN"}
 		width, height := p.MeasureText(0, span)
 		x, y := r.X, r.Y+(r.H-height)/2
 		outlineText(p, x, y, span, accent, 2)
@@ -107,9 +107,14 @@ func (lyricEdgeMask) PaintEffect(p *ui.Painter, box ui.Rect, content *ui.Bitmap,
 	scale := p.Scale()
 	edge := box.H * .1
 	strip := float32(1) / scale
-	for y := float32(0); y < box.H; y += strip {
-		height := min(strip, box.H-y)
-		alpha := min(1, min((y+height/2)/edge, (box.H-y-height/2)/edge))
+	draw := func(y, height, alpha float32) {
 		p.ImageRegion(content, ui.Rect{X: inset.X, Y: inset.Y + y*scale, W: box.W * scale, H: height * scale}, ui.Rect{X: box.X, Y: box.Y + y, W: box.W, H: height}, ui.ImageOptions{Tint: white.Alpha(alpha)})
+	}
+	draw(edge, box.H-2*edge, 1)
+	for y := float32(0); y < edge; y += strip {
+		height := min(strip, edge-y)
+		alpha := (y + height/2) / edge
+		draw(y, height, alpha)
+		draw(box.H-y-height, height, alpha)
 	}
 }

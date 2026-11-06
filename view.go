@@ -44,22 +44,28 @@ func (s *app) view(c *ui.Context) {
 			s.lyricsView(c)
 			return
 		}
-		ui.Scroll(c.Key("page-scroll")).Fill().TrackScroll(&s.scroll).Children(func() {
-			ui.Column(c).Width(min(900, w-40)).AlignSelf(ui.Center).Padding(40, 0, 150, 0).Children(func() {
-				s.searchBox(c)
-				if s.page == "playlists" {
-					s.localPlaylistsView(c)
-				} else if len(s.categories) > 0 {
-					s.categoriesView(c)
-				} else if len(s.collections) > 0 {
-					s.collectionsView(c)
-				} else {
-					s.resultsView(c)
-				}
+		content := ui.Box(c).Fill()
+		if s.modal != "" {
+			content.Blur(5).Cache()
+		}
+		content.Children(func() {
+			ui.Scroll(c.Key("page-scroll")).Fill().TrackScroll(&s.scroll).Children(func() {
+				ui.Column(c).Width(min(900, w-40)).AlignSelf(ui.Center).Padding(40, 0, 150, 0).Children(func() {
+					s.searchBox(c)
+					if s.page == "playlists" {
+						s.localPlaylistsView(c)
+					} else if len(s.categories) > 0 {
+						s.categoriesView(c)
+					} else if len(s.collections) > 0 {
+						s.collectionsView(c)
+					} else {
+						s.resultsView(c)
+					}
+				})
 			})
+			s.toolbar(c, h)
+			s.playerView(c)
 		})
-		s.toolbar(c, h)
-		s.playerView(c)
 		if s.modal != "" {
 			s.modalView(c, w, h)
 		}
@@ -68,7 +74,7 @@ func (s *app) view(c *ui.Context) {
 }
 func (s *app) searchBox(c *ui.Context) {
 	ui.Column(c.Key("search-box")).Background(white.Alpha(.95)).Border(1, white.Alpha(.5)).Radius(20).Padding(30).Shadow(0, 4, 6, 0, ui.RGBA(0, 0, 0, .05)).Margin(0, 0, 30, 0).Children(func() {
-		ui.Row(c).Justify(ui.Center).Gap(14).Effect(headingGradient{}).Height(45).Margin(0, 0, 25, 0).AlignItems(ui.Center).Children(func() {
+		ui.Row(c).Justify(ui.Center).Gap(14).Effect(headingGradient{}).Cache().Height(45).Margin(0, 0, 25, 0).AlignItems(ui.Center).Children(func() {
 			glyph(c, "music", 35, white)
 			ui.Text(c, "music-dl").FontSize(35.2).LetterSpacing(-1).FontWeight(800).TextColor(white)
 		})
@@ -122,15 +128,19 @@ func (s *app) searchBox(c *ui.Context) {
 			pill(c, "ranking", "排行榜", "#fb923c", "#ef4444", func() { s.browse("ranks", "netease", "") })
 			pill(c, "heart", "我的歌单", "#34d399", "#06b6d4", func() { s.browse("mine", "netease", "") })
 		})
-		ui.Row(c).AlignItems(ui.Center).Padding(0, 0, 8, 0).Margin(0, 0, 12, 0).BorderWidth(0, 0, 1, 0).BorderColor(ui.Hex("#edf2f7")).Children(func() {
+		sourceHeader := ui.Row(c).AlignItems(ui.Center)
+		if !s.sourceCollapsed {
+			sourceHeader.Padding(0, 0, 8, 0).Margin(0, 0, 12, 0).BorderWidth(0, 0, 1, 0).BorderColor(ui.Hex("#edf2f7"))
+		}
+		sourceHeader.Children(func() {
 			ui.Button(c, "").Padding(0).Background(ui.Transparent).Border(0, ui.Transparent).Label("搜索源设置").OnClick(func() { s.sourceCollapsed = !s.sourceCollapsed }).Children(func() {
 				ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
 					ui.Text(c, "搜索源设置").FontSize(14.4).Bold().TextColor(muted)
-					arrow := "caret-up"
+					angle := float32(0)
 					if s.sourceCollapsed {
-						arrow = "chevron"
+						angle = 180
 					}
-					glyph(c, arrow, 11, muted)
+					glyph(c, "caret-up", 11, muted).AnimatePose(ui.Pose{Rotate: angle}, hoverAnimation)
 				})
 			})
 			ui.Spacer(c)
@@ -401,10 +411,7 @@ func (s *app) collectionsView(c *ui.Context) {
 	contentWidth := min(900, width-40)
 	cols := max(1, int((contentWidth+20)/200))
 	size := (contentWidth - float32(cols-1)*20) / float32(cols)
-	ui.Row(c).Padding(10, 12).Margin(0, 0, 15, 0).Background(white.Alpha(.85)).Border(1, ui.Hex("#edf2f7")).Radius(12).Children(func() {
-		glyph(c, "list", 14, textColor).Margin(0, 8, 0, 0)
-		ui.Text(c, fmt.Sprintf("找到 %d 个歌单", len(s.collections))).FontSize(14).Bold()
-	})
+	s.collectionResultHeader(c, len(s.collections), s.searchKind)
 	ui.Grid(c).Columns(cols).Gap(20).Children(func() {
 		for _, p := range s.collections {
 			card := ui.Column(c.Key(p.Source+":"+p.ID)).Background(white).Radius(16).Clip().Shadow(0, 4, 6, 0, ui.RGBA(0, 0, 0, .05))

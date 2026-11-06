@@ -168,6 +168,7 @@ func TestRenderPreview(t *testing.T) {
 			t.Fatal(e)
 		}
 		s.results[0] = track
+		s.images[track.Cover] = s.cover
 	}
 	s.current = &s.results[0]
 	s.duration = 258 * time.Second
@@ -185,14 +186,15 @@ func TestRenderPreview(t *testing.T) {
 		s.position = 63 * time.Second
 		s.duration = time.Duration(s.current.Duration) * time.Second
 	}
-	for _, name := range []string{"main", "main-playing", "song-menu", "list-tools", "player", "settings", "mini", "mini-paused", "lyrics"} {
+	for _, name := range []string{"main", "main-playing", "song-menu", "list-tools", "player", "settings", "mini", "mini-paused", "mini-hover", "lyrics", "playlists", "playlist-editor", "collection-picker"} {
 		s.playing = name != "main" && name != "song-menu" && name != "mini-paused"
 		s.modal = ""
 		s.toolsOpen, s.songMenuOpen, s.lyricOpen = false, false, false
+		s.page = "library"
 		s.playerExpanded = name == "player"
 		view := s.view
 		w, h := 1080, 740
-		if name == "mini" || name == "mini-paused" {
+		if name == "mini" || name == "mini-paused" || name == "mini-hover" {
 			view = s.miniView
 			w, h = 236, 50
 		}
@@ -202,8 +204,27 @@ func TestRenderPreview(t *testing.T) {
 		if name == "lyrics" {
 			s.lyricOpen = true
 		}
+		if name == "playlists" || name == "playlist-editor" || name == "collection-picker" {
+			s.cfg.Playlists = []library.Playlist{{ID: "review", Name: "睡前听的歌", Description: "轻柔的旋律", Tracks: append([]library.Track(nil), s.results...)}}
+			if name == "playlists" {
+				s.openSavedPlaylists()
+				h = 1000
+			}
+			if name == "playlist-editor" {
+				s.editPlaylist(nil)
+			}
+			if name == "collection-picker" {
+				s.pendingTracks = []library.Track{s.results[0]}
+				s.modal = "collections"
+			}
+		}
+
 		tt := ui.NewTester(view, w, h)
 		tt.Advance(time.Second)
+		if name == "mini-hover" {
+			tt.Move(120, 25)
+			tt.Advance(time.Second)
+		}
 		if name == "song-menu" {
 			if err := tt.Click("更多操作 " + s.results[0].Name); err != nil {
 				t.Fatal(err)

@@ -92,7 +92,7 @@ func (s *app) miniView(c *ui.Context) {
 func scrollingCaption(c *ui.Context, text, font string, size float32, color ui.Color, elapsed time.Duration, playing bool) {
 	frameAt := c.Now()
 	ui.Box(c).Height(size + 5).Label(text).Clip().Draw(func(p *ui.Painter, r ui.Rect) {
-		span := ui.Span{Text: text, Size: size, Font: font, Color: color, Weight: 400}
+		span := ui.Span{Text: text, Size: size, Font: font, Color: color, Weight: 400, Lang: "zh-CN"}
 		width, height := p.MeasureText(0, span)
 		shift := float32(0)
 		if playing && width > r.W {

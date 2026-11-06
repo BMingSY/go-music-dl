@@ -12,7 +12,7 @@ var assetsOnce sync.Once
 var icons = map[string]string{
 	"music": "\uf001", "search": "\uf002", "fire": "\uf06d", "folder": "\uf07c", "grid": "\uf009", "rank": "\uf091", "heart": "\uf004", "gear": "\uf013", "download": "\uf019", "history": "\uf1da", "clock": "\uf017", "up": "\uf062", "down": "\uf063", "headphones": "\uf025", "play": "\uf04b", "pause": "\uf04c", "prev": "\uf048", "next": "\uf051", "repeat": "\uf01e", "shuffle": "\uf074", "list": "\uf03a", "close": "\uf00d", "volume": "\uf028", "file": "\uf15c", "image": "\uf03e", "back": "\uf060", "mini": "\uf2d0", "user": "\uf007", "chevron": "\uf107", "sliders": "\uf1de", "plus": "\uf067", "trash": "\uf2ed", "link": "\uf0c1", "video": "\uf008",
 	"font": "\uf031", "keyboard": "\uf11c", "info": "\uf05a", "cookie": "\uf564", "more": "\uf141", "stop": "\uf04d", "cloud": "\uf0ed", "switch": "\uf021", "ranking": "\ue561",
-	"spinner": "\uf110", "edit": "\uf303", "caret-up": "\uf106", "user-circle": "\uf2bd", "circle-close": "\uf057", "target": "\uf140",
+	"disc": "\uf51f", "clapper": "\ue131", "spinner": "\uf110", "edit": "\uf303", "caret-up": "\uf106", "user-circle": "\uf2bd", "circle-close": "\uf057", "target": "\uf140",
 }
 
 func initAssets() {

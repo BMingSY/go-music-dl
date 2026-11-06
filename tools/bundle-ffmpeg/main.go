@@ -178,7 +178,7 @@ func fetchSource(url, path, sum string) error {
 		return err
 	}
 	req.Header.Set("User-Agent", "music-dl-build")
-	resp, err := (&http.Client{Timeout: 5 * time.Minute}).Do(req)
+	resp, err := (&http.Client{Timeout: 90 * time.Second}).Do(req)
 	if err != nil {
 		return err
 	}
@@ -402,11 +402,6 @@ func (b *builder) bundle() error {
 	data, _ := json.MarshalIndent(sources, "", "  ")
 	if err := os.WriteFile(filepath.Join(dest, "media-sources.json"), data, 0644); err != nil {
 		return err
-	}
-	if b.system == "windows" {
-		if err := copyFile("resources/licenses/MinGW-winpthreads.txt", filepath.Join(dest, "licenses", "MinGW-winpthreads.txt")); err != nil {
-			return err
-		}
 	}
 	var size int64
 	filepath.WalkDir(dest, func(path string, d os.DirEntry, err error) error {

@@ -26,9 +26,9 @@ func (s *app) modalView(c *ui.Context, w, h float32) {
 		width = 420
 		height = 430
 	}
-	if s.modal == "edit-playlist" {
-		width = 400
-		height = min(h-40, 400)
+	if s.modal == "edit-playlist" || s.modal == "collections" {
+		s.playlistEditorModal(c, w, h)
+		return
 	}
 	if s.modal == "collections" {
 		width = 400
@@ -154,62 +154,50 @@ func (s *app) settingsView(c *ui.Context) {
 	ui.PrimaryButton(c, "保存设置").FillWidth().Height(40).FontSize(14).FontWeight(600).OnClick(func() { s.save(); s.closeModal() })
 }
 func (s *app) savedPlaylistsView(c *ui.Context) {
-	ui.Row(c).AlignItems(ui.Center).Children(func() {
+	ui.Row(c).AlignItems(ui.Center).Margin(0, 0, 15, 0).Children(func() {
 		ui.Text(c, "选择或管理歌单").FontSize(14).TextColor(muted).Grow(1)
-		ui.PrimaryButton(c, "+ 新建").Label("新建歌单").Radius(20).Padding(6, 12).FontSize(12).OnClick(func() { s.editPlaylist(nil) })
+		ui.Button(c, "+ 新建").Label("新建歌单").TextColor(white).Background(accent).Border(0, ui.Transparent).Radius(20).Padding(6, 12).FontSize(12).OnClick(func() { s.editPlaylist(nil) })
 	})
 	ui.Scroll(c).Grow(1).Children(func() {
 		ui.Column(c).Gap(10).Children(func() {
-			ui.Row(c).Padding(12).Background(ui.Hex("#fff5f5")).Radius(10).Gap(10).Children(func() {
-				glyph(c, "heart", 16, ui.Hex("#f68084"))
-				ui.Text(c, "我的收藏").Grow(1)
-				ui.Button(c, "打开").Label("打开我的收藏").OnClick(func() {
-					s.page = "favorites"
-					s.collections = nil
-					s.categories = nil
-					s.pageNumber = 1
-					s.closeModal()
-				})
-				if len(s.pendingTracks) > 0 {
-					ui.Button(c, "加入收藏").OnClick(func() {
-						for _, t := range s.pendingTracks {
-							if !s.isFavorite(t) {
-								s.favorite(t)
-							}
-						}
-						s.closeModal()
-					})
+			lists := append([]library.Playlist{{ID: "favorites", Name: "我的收藏", Tracks: s.cfg.Favorites}}, s.cfg.Playlists...)
+			for _, p := range lists {
+				row := ui.Row(c.Key(p.ID)).Padding(10).Border(1, border).Radius(12).Background(ui.Hex("#faf8f8")).AlignItems(ui.Center)
+				if row.Hovered() {
+					row.Border(1, accent).Background(ui.Hex("#f0fff4"))
 				}
-			})
-			for _, p := range s.cfg.Playlists {
-				ui.Row(c.Key(p.ID)).Padding(12).Border(1, border).Radius(10).Gap(8).Children(func() {
-					ui.Column(c).Grow(1).Gap(4).Children(func() {
-						ui.Text(c, p.Name).Bold()
-						ui.Text(c, fmt.Sprintf("%d 首歌曲", len(p.Tracks))).FontSize(12).TextColor(muted)
-					})
-					if len(s.pendingTracks) > 0 {
-						ui.Button(c, "加入").OnClick(func() { s.addToPlaylist(p.ID, s.pendingTracks) })
+				row.Children(func() {
+					label := "加入"
+					if p.ID == "favorites" {
+						label = "加入收藏"
 					}
-					ui.Button(c, "打开").OnClick(func() {
-						s.page = "collection"
-						s.localPlaylistID = p.ID
-						s.collectionTitle = p.Name
-						s.collections = nil
-						s.categories = nil
-						s.pageNumber = 1
-						s.closeModal()
+					ui.Row(c).Grow(1).Gap(12).AlignItems(ui.Center).Label(label).OnClick(func() {
+						if len(s.pendingTracks) == 0 {
+							s.openLocalPlaylist(p)
+							s.modal = ""
+							return
+						}
+						if p.ID == "favorites" {
+							for _, t := range s.pendingTracks {
+								if !s.isFavorite(t) {
+									s.favorite(t)
+								}
+							}
+							s.closeModal()
+							return
+						}
+						s.addToPlaylist(p.ID, s.pendingTracks)
+					}).Children(func() {
+						ui.Box(c).Size(40, 40).Radius(6).Clip().Children(func() { s.playlistCoverView(c, p.Name, p.Cover, p.ID, 40) })
+						ui.Text(c, p.Name).FontSize(14).SingleLine().Ellipsis("…").Grow(1)
 					})
-					iconButton(c, "delete", "trash", "删除歌单 "+p.Name, 28).OnClick(func() { s.confirmDeletePlaylist(p.ID, p.Name) })
+					if p.ID != "favorites" {
+						iconButton(c, "edit", "edit", "编辑歌单 "+p.Name, 28).Radius(6).Border(1, border).Margin(0, 0, 0, 10).OnClick(func() { s.editPlaylist(&p) })
+						iconButton(c, "delete", "trash", "删除歌单 "+p.Name, 28).Radius(6).Border(1, border).Margin(0, 0, 0, 6).OnClick(func() { s.confirmDeletePlaylist(p.ID, p.Name) })
+					}
 				})
 			}
 		})
-	})
-	if s.playlistError != "" {
-		ui.Text(c, s.playlistError).FontSize(12).TextColor(ui.Hex("#e53e3e"))
-	}
-	ui.Row(c).Gap(8).Children(func() {
-		ui.Button(c, "导入歌单").OnClick(s.importPlaylists)
-		ui.Button(c, "导出歌单").OnClick(s.exportPlaylists)
 	})
 }
 func (s *app) confirmDeletePlaylist(id, name string) {
@@ -284,5 +272,37 @@ func (s *app) aboutView(c *ui.Context) {
 	ui.Text(c, s.status).FontSize(13).TextColor(muted).MaxLines(5)
 	if s.updateBusy {
 		ui.Box(c).Height(5).Background(border).Radius(3).Children(func() { ui.Box(c).WidthPercent(float32(s.updateProgress * 100)).Height(5).Background(accent).Radius(3) })
+	}
+}
+
+func (s *app) playlistEditorModal(c *ui.Context, w, h float32) {
+	height := float32(372)
+	title := "新建歌单"
+	if s.editPlaylistID != "" {
+		title = "编辑歌单"
+	}
+	if s.modal == "collections" {
+		height = min(h*.85, 136+float32(len(s.cfg.Playlists)+1)*72)
+		title = "收藏到我的歌单"
+	}
+	if s.playlistError != "" {
+		height += 36
+	}
+	back := ui.Box(c.Key("modal-backdrop")).Absolute().Fill().Background(ui.RGBA(0, 0, 0, .5)).Center().Modal()
+	back.Children(func() {
+		ui.Column(c).Width(min(w-40, 450)).Height(min(h*.85, height)).Padding(25).Radius(20).Background(white).Shadow(0, 20, 40, 0, ui.RGBA(0, 0, 0, .2)).Transition(panelTransition).Children(func() {
+			ui.Row(c).Height(27).Margin(0, 0, 15, 0).AlignItems(ui.Center).Children(func() {
+				ui.Text(c, title).FontSize(18).Bold().Grow(1)
+				iconButton(c, "close-editor", "close", "关闭弹窗", 20).Background(ui.Transparent).OnClick(s.closeModal)
+			})
+			if s.modal == "collections" {
+				s.savedPlaylistsView(c)
+			} else {
+				ui.Scroll(c).Grow(1).Children(func() { ui.Column(c).Children(func() { s.editPlaylistView(c) }) })
+			}
+		})
+	})
+	if back.OverlayShortcut(0, ui.KeyEscape) {
+		s.closeModal()
 	}
 }

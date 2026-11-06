@@ -106,16 +106,16 @@ func (s *app) editPlaylistView(c *ui.Context) {
 	for _, field := range []struct {
 		label, placeholder string
 		value              *string
-	}{{"歌单名称 *", "例如: 睡前听的歌", &s.playlistName}, {"描述", "简单描述一下...", &s.playlistDescription}, {"封面图片 (URL)", "留空则自动生成封面", &s.playlistCover}} {
-		ui.Column(c).Gap(8).Margin(0, 0, 6, 0).Children(func() {
-			ui.Text(c, field.label).FontSize(13).FontWeight(600).TextColor(textColor)
-			ui.TextInput(c, field.value).Label(field.label).Placeholder(field.placeholder).FontSize(14).Height(42).Padding(10, 12).Radius(8).Border(1, border).Background(white)
+	}{{"歌单名称 *", "例如: 睡前听的歌", &s.playlistName}, {"描述", "简单描述一下...", &s.playlistDescription}, {"封面图片 (URL)", "留空则自动生成随机封面", &s.playlistCover}} {
+		ui.Column(c).Gap(4).Margin(0, 0, 15, 0).Children(func() {
+			ui.Text(c, field.label).FontSize(12).FontWeight(600).TextColor(muted)
+			ui.TextInput(c, field.value).Label("编辑"+strings.TrimSuffix(field.label, " *")).Placeholder(field.placeholder).FontSize(14).Height(38).Padding(10).Radius(8).Border(1, border).Background(white)
 		})
 	}
 	if s.playlistError != "" {
 		ui.Text(c, s.playlistError).FontSize(12).TextColor(ui.Hex("#e53e3e")).MaxLines(3)
 	}
-	ui.PrimaryButton(c, "保存歌单").FillWidth().Height(42).Radius(8).OnClick(s.saveEditedPlaylist)
+	ui.Button(c, "保存歌单").FillWidth().Height(45).Margin(10, 0, 0, 0).Radius(10).FontSize(15).FontWeight(600).TextColor(white).Gradient(ui.Hex("#34d399"), ui.Hex("#059669"), 135).OnClick(s.saveEditedPlaylist)
 }
 func (s *app) localPlaylistsView(c *ui.Context) {
 	playlists := append([]library.Playlist(nil), s.cfg.Playlists...)
@@ -139,6 +139,7 @@ func (s *app) localPlaylistsView(c *ui.Context) {
 	contentWidth := min(900, width-40)
 	cols := max(1, int((contentWidth+20)/200))
 	size := (contentWidth - float32(cols-1)*20) / float32(cols)
+	s.collectionResultHeader(c, len(playlists), "playlist")
 	ui.Grid(c).Columns(cols).Gap(20).Children(func() {
 		for _, p := range playlists {
 			card := ui.Column(c.Key(p.ID)).Background(white).Radius(16).Clip().Shadow(0, 4, 6, 0, ui.RGBA(0, 0, 0, .05))
@@ -186,8 +187,10 @@ func (s *app) playlistCoverView(c *ui.Context, name, cover, id string, size floa
 		choice = (choice + int(r)) % len(colors)
 	}
 	ui.Column(c).Size(size, size).Gradient(ui.Hex(colors[choice][0]), ui.Hex(colors[choice][1]), 135).AlignItems(ui.Center).Justify(ui.Center).Gap(12).Children(func() {
-		glyph(c, "music", 42, white.Alpha(.85))
-		ui.Text(c, name).FontSize(18).Bold().TextColor(white).TextAlign(ui.Center).MaxLines(2).PaddingX(18)
+		glyph(c, "music", min(42, size*.5), white.Alpha(.85))
+		if size >= 100 {
+			ui.Text(c, name).FontSize(18).Bold().TextColor(white).TextAlign(ui.Center).MaxLines(2).PaddingX(18)
+		}
 	})
 }
 func (s *app) openSavedPlaylist(p library.Playlist) {
@@ -312,4 +315,20 @@ func (s *app) downloadRemoteCollection(meta library.Collection) {
 			s.addDownloads(r.Tracks)
 		})
 	}()
+}
+
+func (s *app) collectionResultHeader(c *ui.Context, count int, kind string) {
+	unit, icon := "个歌单", "list"
+	if kind == "album" {
+		unit, icon = "张专辑", "disc"
+	}
+	ui.Column(c).Padding(10, 12).Gap(6).Margin(0, 0, 15, 0).Background(white.Alpha(.85)).Border(1, ui.Hex("#edf2f7")).Radius(12).Shadow(0, 4, 6, 0, ui.RGBA(0, 0, 0, .05)).Children(func() {
+		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+			glyph(c, icon, 14, textColor)
+			ui.Text(c, "找到").FontSize(14).Bold()
+			ui.Text(c, fmt.Sprint(count)).FontSize(14).Bold().TextColor(accent)
+			ui.Text(c, unit).FontSize(14).Bold()
+		})
+		ui.Text(c, fmt.Sprintf("当前第 1 / 1 页，显示 1 - %d / %d", count, count)).FontSize(12).TextColor(muted)
+	})
 }

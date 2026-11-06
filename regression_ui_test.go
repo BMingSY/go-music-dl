@@ -19,8 +19,14 @@ func TestCreateEditAddAndReloadPlaylist(t *testing.T) {
 	if err := tt.Click("新建歌单"); err != nil {
 		t.Fatal(err)
 	}
-	s.playlistName = "睡前听的歌"
-	s.playlistDescription = "双语歌曲"
+	if err := tt.Click("编辑歌单名称"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Type("睡前听的歌")
+	if err := tt.Click("编辑描述"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Type("双语歌曲")
 	tt.Frame()
 	if err := tt.Click("保存歌单"); err != nil {
 		t.Fatal(err)
@@ -48,7 +54,11 @@ func TestCreateEditAddAndReloadPlaylist(t *testing.T) {
 	if err := tt.Click("编辑歌单 睡前听的歌"); err != nil {
 		t.Fatal(err)
 	}
-	s.playlistName = "修改后的歌单"
+	if err := tt.Click("编辑歌单名称"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Key(ui.Ctrl, ui.KeyA)
+	tt.Type("修改后的歌单")
 	tt.Frame()
 	if err := tt.Click("保存歌单"); err != nil {
 		t.Fatal(err)
