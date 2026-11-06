@@ -220,22 +220,25 @@ func (s *app) savePlaylist(name string, tracks []library.Track) {
 	s.save()
 }
 func (s *app) addToPlaylist(id string, tracks []library.Track) {
-	for i := range s.cfg.Playlists {
-		p := &s.cfg.Playlists[i]
+	for _, p := range s.cfg.Playlists {
 		if p.ID != id {
 			continue
 		}
+		p.Tracks = append([]library.Track(nil), p.Tracks...)
 		for _, t := range tracks {
 			if !slices.ContainsFunc(p.Tracks, func(v library.Track) bool { return v.Key() == t.Key() }) {
 				p.Tracks = append(p.Tracks, t)
 			}
 		}
-		s.save()
-		break
+		if !s.storePlaylist(p) {
+			return
+		}
+		s.pendingTracks = nil
+		s.modal = ""
+		s.status = "已加入歌单"
+		return
 	}
-	s.pendingTracks = nil
-	s.modal = ""
-	s.status = "已加入歌单"
+	s.playlistError = "歌单不存在，请重新选择"
 }
 func (s *app) startLogin(source string) {
 	if s.loginCancel != nil {
@@ -443,7 +446,10 @@ func (s *app) importPlaylists() {
 						tracks = append(tracks, t)
 					}
 				}
-				s.savePlaylist(p.Name, tracks)
+				p.Tracks = tracks
+				if !s.storePlaylist(p) {
+					return
+				}
 			}
 			s.status = "歌单已导入"
 		})

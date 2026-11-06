@@ -43,7 +43,7 @@ func (s *app) storePlaylist(p library.Playlist) bool {
 		s.playlistError = "请输入歌单名称"
 		return false
 	}
-	if utf8.RuneCountInString(p.Name) > 30 {
+	if p.Source == "" && utf8.RuneCountInString(p.Name) > 30 {
 		s.playlistError = "歌单名称最多 30 个字"
 		return false
 	}

@@ -21,10 +21,9 @@
 go run .
 ```
 
-构建安装包：
+构建安装包前，按[媒体工具构建说明](tools/bundle-ffmpeg/README.md)准备对应平台的资源。
 
 ```sh
-go run ./tools/bundle-ffmpeg
 go run github.com/egoist/mygo/cmd/mygo@v0.7.4 build
 ```
 
