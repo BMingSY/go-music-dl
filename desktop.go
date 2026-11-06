@@ -21,7 +21,16 @@ import (
 	qrcode "github.com/skip2/go-qrcode"
 )
 
-func (s *app) search() { s.browse(s.searchKind, "", "") }
+func (s *app) search() {
+	if link, source, kind := library.ShareQuery(s.query); source != "" {
+		s.query = link
+		s.selected = map[string]bool{source: true}
+		if kind != "" {
+			s.searchKind = kind
+		}
+	}
+	s.browse(s.searchKind, "", "")
+}
 func (s *app) browse(kind, source, id string) {
 	if s.searchCancel != nil {
 		s.searchCancel()

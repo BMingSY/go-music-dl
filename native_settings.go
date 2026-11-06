@@ -104,7 +104,10 @@ func settingToggle(c *ui.Context, value *bool, title, hint string) bool {
 			changed = ui.SwitchBase(c, value).Label(title).Size(46, 28).Radius(14).Background(bg).Children(func() {
 				ui.Box(c).Absolute().Top(3).Left(x).Size(22, 22).Radius(11).Background(white).Shadow(0, 1, 3, 0, ui.RGBA(0, 0, 0, .25))
 			}).Changed()
-			ui.Text(c, title).FontSize(13).FontWeight(600).OnClick(func() { *value = !*value })
+			if ui.Button(c, title).Padding(0).Background(ui.Transparent).Border(0, ui.Transparent).FontSize(13).FontWeight(600).Clicked() {
+				*value = !*value
+				changed = true
+			}
 		})
 		if hint != "" {
 			ui.Text(c, hint).FontSize(12).LineHeight(1.45).TextColor(muted).Margin(8, 0, 0, 26)
@@ -198,7 +201,11 @@ func (s *app) generalSettings(c *ui.Context) {
 	})
 	ui.Column(c).Gap(4).Children(func() {
 		ui.Text(c, "每页条数").FontSize(12).FontWeight(600).TextColor(muted)
-		size := strconv.Itoa(max(30, s.cfg.PageSize))
+		pageSize := s.cfg.PageSize
+		if pageSize < 20 {
+			pageSize = 30
+		}
+		size := strconv.Itoa(pageSize)
 		if ui.Select(c, &size, []string{"20", "30", "50", "100", "200", "300", "400", "500"}).Label("默认每页条数").Background(white).Radius(8).Height(38).FontSize(14).Changed() {
 			s.cfg.PageSize, _ = strconv.Atoi(size)
 		}

@@ -48,10 +48,14 @@ func TestConfigRoundTripAndMalformedFile(t *testing.T) {
 	}
 	c.NeteaseCookie = "test-cookie"
 	c.Volume = 0
+	c.Shortcuts = map[string]Shortcut{}
 	if err := SaveConfig(path, c); err != nil {
 		t.Fatal(err)
 	}
 	c, err = LoadConfig(path)
+	if c.Shortcuts == nil {
+		t.Fatal("cleared shortcuts must survive a restart")
+	}
 	if err != nil || c.NeteaseCookie != "test-cookie" || c.Volume != 0 {
 		t.Fatalf("config=%+v err=%v", c, err)
 	}

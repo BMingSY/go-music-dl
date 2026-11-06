@@ -25,6 +25,7 @@ import (
 )
 
 type app struct {
+	mascotAlternate                               bool
 	queueOpen, playerVolumeOpen, speedOpen        bool
 	speed                                         float64
 	queryFocused                                  bool

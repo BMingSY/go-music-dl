@@ -10,7 +10,7 @@ import (
 type Config struct {
 	FloatingLyrics bool                `json:"floating_lyrics"`
 	LyricFont      string              `json:"lyric_font"`
-	Shortcuts      map[string]Shortcut `json:"shortcuts,omitempty"`
+	Shortcuts      map[string]Shortcut `json:"shortcuts"`
 	EmbedMetadata  bool                `json:"embed_metadata"`
 	SaveLyrics     bool                `json:"save_lyrics"`
 	LocalFiles     []string            `json:"local_files,omitempty"`

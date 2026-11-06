@@ -46,8 +46,8 @@ func (s *app) view(c *ui.Context) {
 			})
 		})
 		s.toolbar(c, h)
-		if s.cfg.ShowMascot && w > 1100 && mascot != nil {
-			ui.Image(c, mascot).Size(150, 150).Absolute().Right(70).Bottom(130).Fit(ui.Contain)
+		if s.cfg.ShowMascot && w > 768 && mascot != nil {
+			s.mascotView(c)
 		}
 		s.playerView(c)
 		if s.lyricOpen {
@@ -91,7 +91,16 @@ func (s *app) searchBox(c *ui.Context) {
 			pill(c, "heart", "我的歌单", "#34d399", "#06b6d4", func() { s.browse("mine", "netease", "") })
 		})
 		ui.Row(c).AlignItems(ui.Center).Padding(0, 0, 8, 0).Margin(0, 0, 12, 0).BorderWidth(0, 0, 1, 0).BorderColor(ui.Hex("#edf2f7")).Children(func() {
-			ui.Button(c, "").Padding(0).Background(ui.Transparent).Border(0, ui.Transparent).Label("搜索源设置").OnClick(func() { s.sourceCollapsed = !s.sourceCollapsed }).Children(func() { ui.Text(c, "搜索源设置  ⌃").FontSize(14.4).Bold().TextColor(muted) })
+			ui.Button(c, "").Padding(0).Background(ui.Transparent).Border(0, ui.Transparent).Label("搜索源设置").OnClick(func() { s.sourceCollapsed = !s.sourceCollapsed }).Children(func() {
+				ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
+					ui.Text(c, "搜索源设置").FontSize(14.4).Bold().TextColor(muted)
+					arrow := "caret-up"
+					if s.sourceCollapsed {
+						arrow = "chevron"
+					}
+					glyph(c, arrow, 11, muted)
+				})
+			})
 			ui.Spacer(c)
 			ui.Button(c, "全选").FontSize(12).TextColor(muted).Background(ui.Transparent).Border(0, ui.Transparent).OnClick(func() {
 				for _, src := range []string{"netease", "bilibili", "local"} {
