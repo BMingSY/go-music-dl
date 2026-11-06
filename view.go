@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"math"
+	"runtime"
 	"time"
 
 	"github.com/BMingSY/go-music-dl/internal/library"
@@ -24,18 +24,14 @@ func (s *app) view(c *ui.Context) {
 	theme.TextMuted = muted
 	theme.Border = border
 	theme.FontSize = 16
-	theme.Font = "Segoe UI"
+	if runtime.GOOS == "windows" {
+		theme.Font = "Segoe UI"
+	}
 	c.SetTheme(theme)
 	w, h := c.Size()
 	ui.Box(c).Fill().Background(ui.Hex("#eef2f5")).Draw(func(p *ui.Painter, r ui.Rect) {
 		r.H = 600
-		for _, g := range []struct {
-			x     float32
-			color string
-		}{{1, "#722743"}, {.5, "#2f3d6a"}, {0, "#111015"}} {
-			radius := float32(math.Hypot(float64(max(g.x, 1-g.x)*r.W), float64(r.H))) * .5
-			p.FillRadialGradient(r, ui.RadialGradient{Center: ui.Point{X: g.x, Y: .000001}, Radius: radius, Stops: []ui.GradientStop{{Color: ui.Hex(g.color), At: 0}, {Color: ui.Transparent, At: 1}}}, 0)
-		}
+		p.Image(pageBackdrop(int(r.W)), r, ui.Contain)
 	}).Children(func() {
 		ui.Scroll(c.Key("page-scroll")).Fill().TrackScroll(&s.scroll).Children(func() {
 			ui.Column(c).Width(min(900, w-80)).AlignSelf(ui.Center).Padding(40, 0, 150, 0).Children(func() {
@@ -127,6 +123,13 @@ func (s *app) searchBox(c *ui.Context) {
 }
 func (s *app) resultsView(c *ui.Context) {
 	tracks := s.shownTracks()
+	if s.source == "local" && s.page == "library" {
+		ui.Row(c).Background(white).Radius(12).Padding(12).Gap(8).Margin(0, 0, 16, 0).Children(func() {
+			ui.Text(c, "本地音乐").Bold().Grow(1)
+			ui.Button(c, "导入文件").OnClick(s.pickLocalFiles)
+			ui.Button(c, "选择文件夹").OnClick(s.pickFolder)
+		})
+	}
 	if len(tracks) == 0 {
 		if s.searching {
 			ui.Text(c, "正在查找…").TextColor(muted).AlignSelf(ui.Center)
@@ -214,8 +217,28 @@ func (s *app) trackCard(c *ui.Context, t library.Track, i int, tracks []library.
 		}
 		s.trackCover(c, t, 64)
 		ui.Column(c).Grow(1).Gap(6).Children(func() {
-			ui.Text(c, t.Name).FontSize(16).FontWeight(600).SingleLine().Ellipsis("…")
-			ui.Text(c, t.Artist+" · "+t.Album).FontSize(13).TextColor(muted).SingleLine().Ellipsis("…")
+			ui.Text(c, t.Name).FontSize(16).FontWeight(600).SingleLine().Ellipsis("…").OnClick(func() {
+				if t.Link != "" {
+					c.OpenURL(t.Link)
+				}
+			})
+			ui.Row(c).Gap(4).Children(func() {
+				ui.Text(c, t.Artist).FontSize(13).TextColor(muted).SingleLine().Ellipsis("…").OnClick(func() {
+					s.query = t.Artist
+					s.selected = map[string]bool{t.Source: true}
+					s.searchKind = "song"
+					s.search()
+				})
+				if t.Album != "" {
+					ui.Text(c, "·").FontSize(13).TextColor(muted)
+					ui.Text(c, t.Album).FontSize(13).TextColor(muted).SingleLine().Ellipsis("…").OnClick(func() {
+						if t.Source == "netease" {
+							s.query = t.Album
+							s.browse("album", t.Source, t.AlbumID)
+						}
+					})
+				}
+			})
 			ui.Row(c).Gap(6).Children(func() {
 				for _, tag := range []string{t.Source, t.FormatDuration(), t.FormatSize(), t.FormatBitrate()} {
 					if tag != "" {

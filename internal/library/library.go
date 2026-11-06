@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-"maps"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -58,7 +58,24 @@ func provider(source string, cfg Config) (Provider, error) {
 
 func Search(ctx context.Context, source, query string, cfg Config) ([]Track, error) {
 	if source == "local" {
-		return Scan(ctx, cfg.MusicDir, query)
+		tracks, err := Scan(ctx, cfg.MusicDir, query)
+		if os.IsNotExist(err) {
+			err = nil
+		}
+		seen := map[string]bool{}
+		for _, t := range tracks {
+			seen[t.Path] = true
+		}
+		for _, path := range cfg.LocalFiles {
+			if seen[path] {
+				continue
+			}
+			t, e := LocalTrack(path)
+			if e == nil && (query == "" || strings.Contains(strings.ToLower(t.Name+" "+t.Artist), strings.ToLower(query))) {
+				tracks = append(tracks, t)
+			}
+		}
+		return tracks, err
 	}
 	p, err := provider(source, cfg)
 	if err != nil {
@@ -99,8 +116,8 @@ func Search(ctx context.Context, source, query string, cfg Config) ([]Track, err
 }
 
 func Resolve(ctx context.Context, t Track, cfg Config) (Resolved, error) {
-	t.Extra=maps.Clone(t.Extra)
- r := Resolved{Track: t, Headers: make(http.Header)}
+	t.Extra = maps.Clone(t.Extra)
+	r := Resolved{Track: t, Headers: make(http.Header)}
 	if t.Source == "local" {
 		info, err := os.Stat(t.Path)
 		if err != nil || !info.Mode().IsRegular() {
@@ -138,7 +155,7 @@ func Resolve(ctx context.Context, t Track, cfg Config) (Resolved, error) {
 
 // Artwork and lyrics are optional and loaded independently of audio startup.
 func Metadata(ctx context.Context, t Track, cfg Config) (string, []byte) {
- t.Extra=maps.Clone(t.Extra)
+	t.Extra = maps.Clone(t.Extra)
 	if t.Source == "local" {
 		return localMetadata(t.Path)
 	}
@@ -245,4 +262,31 @@ func localMetadata(path string) (string, []byte) {
 		}
 	}
 	return lyrics, cover
+}
+
+func LocalTrack(path string) (Track, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return Track{}, err
+	}
+	info, err := os.Stat(abs)
+	if err != nil || !info.Mode().IsRegular() {
+		return Track{}, errors.New("本地文件不可读")
+	}
+	t := Track{Path: abs, Song: model.Song{ID: abs, Source: "local", Name: strings.TrimSuffix(info.Name(), filepath.Ext(abs)), Artist: "未知作者", Ext: strings.TrimPrefix(strings.ToLower(filepath.Ext(abs)), "."), Size: info.Size()}}
+	f, err := os.Open(abs)
+	if err != nil {
+		return t, err
+	}
+	defer f.Close()
+	if meta, e := tag.ReadFrom(f); e == nil {
+		if meta.Title() != "" {
+			t.Name = meta.Title()
+		}
+		if meta.Artist() != "" {
+			t.Artist = meta.Artist()
+		}
+		t.Album = meta.Album()
+	}
+	return t, nil
 }

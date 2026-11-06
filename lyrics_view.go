@@ -70,6 +70,7 @@ func (s *app) lyricsView(c *ui.Context) {
 						}
 					})
 				})
+				ui.Text(c, s.status).FontSize(12).TextColor(white).MaxLines(2)
 				ui.Row(c).Gap(16).Justify(ui.Center).Children(func() {
 					iconButton(c, "cover", "image", "保存封面", 48).OnClick(s.saveCurrentCover)
 					iconButton(c, "audio", "music", "下载音频", 48).OnClick(func() {

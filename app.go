@@ -25,6 +25,7 @@ import (
 )
 
 type app struct {
+	miniVolumeOpen                                bool
 	selected                                      map[string]bool
 	searchKind                                    string
 	collections                                   []library.Collection

@@ -454,3 +454,21 @@ func supportedTrack(t library.Track) error {
 	}
 	return nil
 }
+
+func (s *app) pickLocalFiles() {
+	go func() {
+		paths, e := mygo.Dialog.Open(mygo.OpenDialogOptions{Parent: s.win, Title: "导入本地音乐", Multiple: true, Filters: []mygo.FileFilter{{Name: "音频文件", Extensions: []string{"mp3", "flac", "m4a", "aac", "ogg", "wav", "wma"}}}})
+		if e != nil {
+			return
+		}
+		s.update(func() {
+			for _, path := range paths {
+				if !slices.Contains(s.cfg.LocalFiles, path) {
+					s.cfg.LocalFiles = append(s.cfg.LocalFiles, path)
+				}
+			}
+			s.save()
+			s.localMusic()
+		})
+	}()
+}

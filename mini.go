@@ -58,8 +58,8 @@ func (s *app) miniView(c *ui.Context) {
 				play = "pause"
 			}
 			iconButton(c, "toggle", play, "播放或暂停", 23).OnClick(s.toggle)
-			volume := iconButton(c, "volume", "volume", "调节音量", 23)
-			if volume.Hovered() {
+			iconButton(c, "volume", "volume", "调节音量", 23).OnClick(func() { s.miniVolumeOpen = !s.miniVolumeOpen })
+			if s.miniVolumeOpen {
 				v := s.cfg.Volume
 				if ui.Slider(c.Key("mini-volume"), &v, 0, 1).Absolute().Bottom(1).Right(26).Width(82).Height(10).Label("悬浮窗音量").Changed() {
 					s.volume(v)
@@ -98,6 +98,9 @@ func (s *app) miniCaption() (string, time.Duration) {
 		if line, elapsed := lyrics.Current(s.lines, s.position); line != "" {
 			return line, elapsed
 		}
+	}
+	if !s.playing {
+		return s.current.Name, 0
 	}
 	return caption(s.current), s.position
 }

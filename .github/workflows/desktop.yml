@@ -47,10 +47,11 @@ jobs:
       - name: Bundle audio tools
         run: |
           go run ./tools/bundle-ffmpeg -platform '${{ matrix.target }}'
-          echo "$PWD/resources/${{ matrix.target }}" >> "$GITHUB_PATH"
+          python3 -c 'import os; print(os.path.abspath("resources/${{ matrix.target }}"))' >> "$GITHUB_PATH"
       - name: Verify
         env:
           MUSIC_DL_REQUIRE_AUDIO_TESTS: '1'
+          MUSIC_DL_TEST_FFMPEG: ${{ github.workspace }}/resources/${{ matrix.target }}/ffmpeg${{ runner.os == 'Windows' && '.exe' || '' }}
         run: |
           go vet ./...
           go test -race -timeout=180s ./...

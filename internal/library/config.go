@@ -8,6 +8,7 @@ import (
 )
 
 type Config struct {
+	LocalFiles     []string   `json:"local_files,omitempty"`
 	NeteaseCookie  string     `json:"netease_cookie,omitempty"`
 	BilibiliCookie string     `json:"bilibili_cookie,omitempty"`
 	MusicDir       string     `json:"music_dir"`

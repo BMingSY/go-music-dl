@@ -69,7 +69,7 @@ func TestMiniLyricsPauseAndNoLyrics(t *testing.T) {
 	}
 	s.playing = false
 	tt.Frame()
-	if text, _ := s.miniCaption(); text != "歌名 · 作者" {
+	if text, _ := s.miniCaption(); text != "歌名" {
 		t.Fatalf("paused caption=%q", text)
 	}
 	s.playing = true

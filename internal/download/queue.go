@@ -55,7 +55,7 @@ func (q *Queue) Add(tracks []library.Track, cfg library.Config) {
 			j := &q.jobs[i]
 			if j.Track.Key() == t.Key() {
 				found = true
-				if j.State == "failed" || j.State == "canceled" {
+				if q.current != t.Key() && (j.State == "failed" || j.State == "canceled") {
 					*j = Job{Track: t, State: "queued", Config: cfg}
 				}
 				break
