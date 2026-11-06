@@ -201,6 +201,7 @@ func (s *app) miniView(c *ui.Context) {
 		ui.Column(c.Key("cover-drag")).Size(48, 48).DragWindow().Children(func() { s.coverView(c, 48) })
 		ui.Column(c.Key("caption")).Grow(1).Clip().DragWindow().Gap(3).Children(func() {
 			text, elapsed := s.miniCaption()
+			frameAt := c.Now()
 			// Keep an accessible text node; paint overflow without truncating
 			// a synchronized line or moving the surrounding window controls.
 			ui.Box(c).Height(23).Label(text).Clip().Draw(func(p *ui.Painter, r ui.Rect) {
@@ -208,7 +209,7 @@ func (s *app) miniView(c *ui.Context) {
 				width, height := p.MeasureText(0, span)
 				shift := float32(0)
 				if s.playing && width > r.W {
-					shift = float32(math.Mod(max(0, elapsed.Seconds()-0.8)*28, float64(width+32)))
+					shift = float32(math.Mod(max(0, elapsed.Seconds()+p.Now().Sub(frameAt).Seconds()-0.8)*28, float64(width+32)))
 					p.AnimationFrameRate(30)
 				}
 				p.RichText(r.X-shift, r.Y+(r.H-height)/2, 0, span)

@@ -153,3 +153,13 @@ func TestRejectHeaderInjection(t *testing.T) {
 		t.Fatal("newline header accepted")
 	}
 }
+
+func TestLocalPathMayContainPercent(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "100% music.wav")
+	if err := os.WriteFile(path, []byte("fixture"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := inputArgs(Input{Location: path}); err != nil {
+		t.Fatal(err)
+	}
+}

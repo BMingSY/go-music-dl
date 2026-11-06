@@ -98,12 +98,12 @@ func (d *Decoder) Len() int64 {
 }
 
 func inputArgs(input Input) ([]string, error) {
-	u, err := url.Parse(input.Location)
-	if err != nil {
-		return nil, errors.New("无效音频地址")
-	}
 	var args []string
-	if u.Scheme == "http" || u.Scheme == "https" {
+	if strings.HasPrefix(input.Location, "http://") || strings.HasPrefix(input.Location, "https://") {
+		u, err := url.Parse(input.Location)
+		if err != nil || u.Host == "" {
+			return nil, errors.New("无效音频地址")
+		}
 		args = append(args, "-rw_timeout", "15000000", "-reconnect", "1", "-reconnect_delay_max", "3")
 		var h strings.Builder
 		for _, k := range []string{"User-Agent", "Referer", "Cookie"} {
@@ -171,15 +171,14 @@ func (d *Decoder) SetPosition(frame int64) error {
 	if old != nil {
 		old.stop()
 	}
-	p, err := d.start(max(0, frame))
 	d.mu.Lock()
 	if d.closed {
 		d.mu.Unlock()
-		if p != nil {
-			p.stop()
-		}
 		return os.ErrClosed
 	}
+	// Starting while holding mu makes Close wait until the new process is
+	// registered, so cancellation cannot leave a child running after it returns.
+	p, err := d.start(max(0, frame))
 	d.proc = p
 	d.lastErr = err
 	d.mu.Unlock()
