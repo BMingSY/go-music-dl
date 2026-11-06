@@ -70,6 +70,7 @@ func (s *app) view(c *ui.Context) {
 			s.modalView(c, w, h)
 		}
 	})
+	s.statusToast(c)
 	s.handleShortcuts(c)
 }
 func (s *app) searchBox(c *ui.Context) {
@@ -172,9 +173,6 @@ func (s *app) searchBox(c *ui.Context) {
 					}
 				}
 			})
-		}
-		if s.status != "" {
-			ui.Text(c, s.status).FontSize(13).TextColor(muted).Margin(14, 0, 0, 0).MaxLines(3)
 		}
 	})
 }

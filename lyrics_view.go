@@ -116,14 +116,20 @@ func (s *app) lyricsView(c *ui.Context) {
 				if s.status != "" {
 					ui.Text(c, s.status).FontSize(12).TextColor(white).MaxLines(2)
 				}
-				ui.Row(c).Gap(16).Justify(ui.Center).Children(func() {
+				ui.Row(c).Gap(15).Justify(ui.Center).Children(func() {
 					coverButton := colorIconButton(c, "cover", "image", "更换封面或背景", 50, white, true).Background(ui.RGBA(0, 0, 0, .7)).Border(1, white.Alpha(.4)).OnClick(s.replacePreviewCover)
 					buttonMotion(coverButton, 1.1, 0)
 					audioButton := colorIconButton(c, "audio", "music", "更换本地音频", 50, white, false).Background(ui.RGBA(0, 0, 0, .7)).Border(1, white.Alpha(.4)).OnClick(s.replacePreviewAudio)
 					buttonMotion(audioButton, 1.1, 0)
 					lyricButton := colorIconButton(c, "lrc", "file", "更换本地歌词", 50, white, false).Background(ui.RGBA(0, 0, 0, .7)).Border(1, white.Alpha(.4)).OnClick(s.replacePreviewLyrics)
 					buttonMotion(lyricButton, 1.1, 0)
-					ui.Button(c, "导出视频").FontSize(16).FontWeight(600).Radius(30).Padding(12, 30).TextColor(white).Background(ui.RGBA(0, 0, 0, .7)).Border(1, white.Alpha(.4)).OnClick(s.exportVideo)
+					exportButton := ui.Button(c, "").Label("导出视频").Radius(30).Padding(12, 30).TextColor(white).Background(ui.RGBA(0, 0, 0, .7)).Border(1, white.Alpha(.4)).OnClick(s.exportVideo).Children(func() {
+						ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+							glyph(c, "clapper", 16, white)
+							ui.Text(c, "导出视频").FontSize(16).FontWeight(600).TextColor(white)
+						})
+					})
+					buttonMotion(exportButton, 1, 2)
 				})
 			})
 			ui.Column(c).Width(containerWidth*.5).FillHeight().Padding(0, 0, 0, 40).Gap(h * .02).Children(func() {

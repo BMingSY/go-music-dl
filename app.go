@@ -25,6 +25,8 @@ import (
 )
 
 type app struct {
+	toastSeen                                                         string
+	toastStarted                                                      time.Time
 	previewInfo                                                       ui.Rect
 	visualEpoch                                                       time.Time
 	discAngle                                                         float64
