@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"slices"
-	"strconv"
 
 	"github.com/BMingSY/go-music-dl/internal/library"
 	"github.com/egoist/mygo"
@@ -11,7 +10,7 @@ import (
 )
 
 func (s *app) modalView(c *ui.Context, w, h float32) {
-	titles := map[string]string{"settings": "系统设置", "collections": "本地歌单", "login": "扫码登录", "downloads": "下载管理", "tools": "列表工具", "about": "关于 music-dl"}
+	titles := map[string]string{"settings": "系统设置", "collections": "本地歌单", "login": "扫码登录", "downloads": "下载管理", "about": "关于 music-dl"}
 	width, height := float32(640), min(h-40, 600)
 	if s.modal == "settings" {
 		width = 760
@@ -43,8 +42,6 @@ func (s *app) modalView(c *ui.Context, w, h float32) {
 					s.loginView(c)
 				case "downloads":
 					s.downloadsView(c)
-				case "tools":
-					s.toolsView(c)
 				case "about":
 					s.aboutView(c)
 				}
@@ -52,7 +49,11 @@ func (s *app) modalView(c *ui.Context, w, h float32) {
 		})
 	})
 	if back.OverlayShortcut(0, ui.KeyEscape) {
-		s.closeModal()
+		if s.captureShortcut != "" {
+			s.captureShortcut = ""
+		} else {
+			s.closeModal()
+		}
 	}
 }
 func setting(c *ui.Context, title string, body func()) {
@@ -60,42 +61,31 @@ func setting(c *ui.Context, title string, body func()) {
 }
 func (s *app) settingsView(c *ui.Context) {
 	ui.Row(c).Padding(4).Gap(5).Background(ui.Hex("#f8fafc")).Border(1, border).Radius(12).Children(func() {
-		for _, tab := range []struct{ id, label string }{{"general", "常规"}, {"download", "下载与同步"}, {"cookies", "平台 Cookie"}} {
+		for _, tab := range []struct{ id, label, icon string }{{"general", "常规", "sliders"}, {"download", "下载与同步", "download"}, {"cookies", "平台 Cookie", "cookie"}} {
 			bg := ui.Transparent
 			if s.settingsTab == tab.id {
 				bg = white
 			}
-			ui.Button(c, tab.label).Grow(1).FontSize(13).FontWeight(700).Background(bg).Border(0, ui.Transparent).Radius(8).Padding(9, 12).OnClick(func() { s.settingsTab = tab.id })
+			fg := ui.Hex("#64748b")
+			if s.settingsTab == tab.id {
+				fg = ui.Hex("#047857")
+			}
+			b := ui.Button(c, "").Label(tab.label).Grow(1).Background(bg).Border(0, ui.Transparent).Radius(8).Padding(9, 12).OnClick(func() { s.settingsTab = tab.id }).Children(func() {
+				ui.Row(c).Gap(5).AlignItems(ui.Center).Children(func() { glyph(c, tab.icon, 13, fg); ui.Text(c, tab.label).FontSize(13).FontWeight(700).TextColor(fg) })
+			})
+			if s.settingsTab == tab.id {
+				b.Shadow(0, 2, 8, 0, ui.RGBA(15, 23, 42, .08))
+			}
 		}
 	})
 	ui.Scroll(c.Key(s.settingsTab)).Grow(1).Children(func() {
 		ui.Column(c).Padding(2, 4).Gap(14).Children(func() {
 			switch s.settingsTab {
 			case "general":
-				setting(c, "悬浮歌词", func() { ui.Button(c, "显示 / 隐藏悬浮窗").OnClick(s.toggleMini) })
-				setting(c, "歌词字体", func() {
-					size := float64(s.cfg.LyricSize)
-					if size == 0 {
-						size = 24
-					}
-					if ui.Slider(c, &size, 14, 48).Label("歌词字号").Changed() {
-						s.cfg.LyricSize = float32(size)
-					}
-					ui.Text(c, fmt.Sprintf("字号 %.0f px", size)).FontSize(12).TextColor(muted)
-					ui.Text(c, "示例歌词 · 让每一句都清晰可见").FontSize(float32(size)).TextColor(accent)
-				})
-				setting(c, "音乐文件夹", func() {
-					ui.Row(c).Gap(8).Children(func() {
-						ui.TextInput(c, &s.cfg.MusicDir).Label("音乐文件夹").Grow(1).FontSize(14)
-						ui.Button(c, "浏览文件夹").OnClick(s.pickFolder)
-					})
-				})
-				setting(c, "界面", func() {
-					ui.Checkbox(c, &s.cfg.ShowMascot, "显示桌面挂件")
-					ui.Text(c, "关闭主窗口后继续播放，可从托盘或悬浮窗恢复。").FontSize(12).TextColor(muted)
-				})
-				setting(c, "关于", func() { ui.Button(c, "关于 music-dl").OnClick(func() { s.modal = "about" }) })
+				s.generalSettings(c)
 			case "download":
+				settingToggle(c, &s.cfg.EmbedMetadata, "下载时内嵌元数据（封面、歌词）", "支持 MP3、FLAC 和 M4A；播放时使用原始音频流。")
+				settingToggle(c, &s.cfg.SaveLyrics, "保存音乐时同时生成同名 LRC", "已有同名歌词不会被覆盖。")
 				setting(c, "下载目录", func() {
 					ui.Row(c).Gap(8).Children(func() {
 						ui.TextInput(c, &s.cfg.DownloadDir).Label("下载目录").Grow(1).FontSize(14)
@@ -136,10 +126,10 @@ func (s *app) settingsView(c *ui.Context) {
 			}
 		})
 	})
-	ui.Row(c).Gap(8).Children(func() {
-		ui.Text(c, s.status).FontSize(12).TextColor(muted).Grow(1).MaxLines(2)
-		ui.PrimaryButton(c, "保存设置").OnClick(func() { s.save(); s.closeModal() })
-	})
+	if s.status != "" {
+		ui.Text(c, s.status).FontSize(12).TextColor(muted).MaxLines(2)
+	}
+	ui.PrimaryButton(c, "保存设置").FillWidth().Height(40).FontSize(14).FontWeight(600).OnClick(func() { s.save(); s.closeModal() })
 }
 func (s *app) savedPlaylistsView(c *ui.Context) {
 	ui.Row(c).Gap(8).Children(func() {
@@ -260,42 +250,6 @@ func (s *app) downloadsView(c *ui.Context) {
 			}
 		})
 	})
-}
-func (s *app) toolsView(c *ui.Context) {
-	setting(c, "每页显示", func() {
-		size := strconv.Itoa(s.cfg.PageSize)
-		if ui.Select(c, &size, []string{"20", "30", "50", "100", "200", "300", "400", "500"}).Changed() {
-			s.cfg.PageSize, _ = strconv.Atoi(size)
-			s.pageNumber = 1
-			s.save()
-		}
-	})
-	setting(c, "歌曲排序", func() {
-		ui.Row(c).Gap(8).Children(func() {
-			for _, o := range []struct{ id, label string }{{"", "默认"}, {"quality", "音质"}, {"size", "大小"}, {"duration", "时长"}, {"name", "歌名"}} {
-				ui.Radio(c, &s.sortMode, o.id, o.label)
-			}
-			ui.Checkbox(c, &s.sortReverse, "降序")
-		})
-	})
-	ui.Button(c, "播放全部").OnClick(func() { s.play(0, s.shownTracks()); s.closeModal() })
-	ui.Button(c, "批量操作").OnClick(func() { s.batch = !s.batch; s.closeModal() })
-	ui.Button(c, "下载全部").OnClick(func() { s.addDownloads(s.shownTracks()); s.closeModal() })
-	if s.page == "collection" {
-		ui.Button(c, "移除已选歌曲").OnClick(func() {
-			for i := range s.cfg.Playlists {
-				p := &s.cfg.Playlists[i]
-				if p.ID == s.localPlaylistID {
-					p.Tracks = slices.DeleteFunc(p.Tracks, func(t library.Track) bool { return s.checked[t.Key()] })
-				}
-			}
-			s.save()
-			s.closeModal()
-		})
-	}
-	if s.page == "history" {
-		ui.Button(c, "清空播放历史").OnClick(func() { s.cfg.History = nil; s.save(); s.closeModal() })
-	}
 }
 func (s *app) aboutView(c *ui.Context) {
 	ui.Text(c, "music-dl").FontSize(28).Bold().TextColor(accent)

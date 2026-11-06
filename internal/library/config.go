@@ -8,20 +8,31 @@ import (
 )
 
 type Config struct {
-	LocalFiles     []string   `json:"local_files,omitempty"`
-	NeteaseCookie  string     `json:"netease_cookie,omitempty"`
-	BilibiliCookie string     `json:"bilibili_cookie,omitempty"`
-	MusicDir       string     `json:"music_dir"`
-	FFmpeg         string     `json:"ffmpeg,omitempty"`
-	Volume         float64    `json:"volume"`
-	Favorites      []Track    `json:"favorites,omitempty"`
-	Playlists      []Playlist `json:"playlists,omitempty"`
-	History        []Track    `json:"history,omitempty"`
-	DownloadDir    string     `json:"download_dir"`
-	PageSize       int        `json:"page_size"`
-	LyricSize      float32    `json:"lyric_size"`
-	PlayMode       string     `json:"play_mode"`
-	ShowMascot     bool       `json:"show_mascot"`
+	FloatingLyrics bool                `json:"floating_lyrics"`
+	LyricFont      string              `json:"lyric_font"`
+	Shortcuts      map[string]Shortcut `json:"shortcuts,omitempty"`
+	EmbedMetadata  bool                `json:"embed_metadata"`
+	SaveLyrics     bool                `json:"save_lyrics"`
+	LocalFiles     []string            `json:"local_files,omitempty"`
+	NeteaseCookie  string              `json:"netease_cookie,omitempty"`
+	BilibiliCookie string              `json:"bilibili_cookie,omitempty"`
+	MusicDir       string              `json:"music_dir"`
+	FFmpeg         string              `json:"ffmpeg,omitempty"`
+	Volume         float64             `json:"volume"`
+	Favorites      []Track             `json:"favorites,omitempty"`
+	Playlists      []Playlist          `json:"playlists,omitempty"`
+	History        []Track             `json:"history,omitempty"`
+	DownloadDir    string              `json:"download_dir"`
+	PageSize       int                 `json:"page_size"`
+	LyricSize      float32             `json:"lyric_size"`
+	PlayMode       string              `json:"play_mode"`
+	ShowMascot     bool                `json:"show_mascot"`
+}
+
+type Shortcut struct {
+	Key       uint16 `json:"key"`
+	Modifiers uint8  `json:"modifiers"`
+	Label     string `json:"label"`
 }
 
 func ConfigPath() (string, error) {
@@ -37,7 +48,7 @@ func ConfigPath() (string, error) {
 
 func LoadConfig(path string) (Config, error) {
 	home, _ := os.UserHomeDir()
-	c := Config{MusicDir: filepath.Join(home, "Music"), Volume: 0.7, DownloadDir: filepath.Join(home, "Music", "music-dl"), PageSize: 30, LyricSize: 24, ShowMascot: true}
+	c := Config{MusicDir: filepath.Join(home, "Music"), Volume: 0.7, DownloadDir: filepath.Join(home, "Music", "music-dl"), PageSize: 30, LyricSize: 24, ShowMascot: true, FloatingLyrics: true, EmbedMetadata: true, SaveLyrics: true}
 	b, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return c, nil

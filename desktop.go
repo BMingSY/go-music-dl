@@ -54,6 +54,10 @@ func (s *app) browse(kind, source, id string) {
 		s.status = "请选择支持此功能的音乐来源"
 		return
 	}
+	s.source = ""
+	if len(sources) == 1 {
+		s.source = sources[0]
+	}
 	go func() {
 		type result struct {
 			data library.Catalog
@@ -97,7 +101,12 @@ func (s *app) openCollection(c library.Collection) {
 	s.browse(c.Kind, c.Source, c.ID)
 	s.collectionTitle = c.Name
 }
-func (s *app) localMusic() { s.searchKind = "song"; s.selectSource("local"); s.pageNumber = 1 }
+func (s *app) localMusic() {
+	s.query = ""
+	s.searchKind = "song"
+	s.selectSource("local")
+	s.pageNumber = 1
+}
 func (s *app) shownTracks() []library.Track {
 	tracks := s.results
 	switch s.page {
@@ -300,6 +309,7 @@ func (s *app) startLogin(source string) {
 	}()
 }
 func (s *app) closeModal() {
+	s.captureShortcut = ""
 	if s.modal == "login" && s.loginCancel != nil {
 		s.loginCancel()
 		s.loginID++
@@ -453,6 +463,55 @@ func supportedTrack(t library.Track) error {
 		return errors.New("本地路径必须为绝对路径")
 	}
 	return nil
+}
+
+func (s *app) removeFromCollection(t library.Track) {
+	if s.page == "favorites" {
+		s.cfg.Favorites = slices.DeleteFunc(s.cfg.Favorites, func(track library.Track) bool { return track.Key() == t.Key() })
+	}
+	if s.page == "collection" {
+		for i := range s.cfg.Playlists {
+			if s.cfg.Playlists[i].ID == s.localPlaylistID {
+				s.cfg.Playlists[i].Tracks = slices.DeleteFunc(s.cfg.Playlists[i].Tracks, func(track library.Track) bool { return track.Key() == t.Key() })
+			}
+		}
+	}
+	s.save()
+}
+
+func (s *app) trashLocalTrack(t library.Track) {
+	if t.Source != "local" || !filepath.IsAbs(t.Path) {
+		return
+	}
+	go func() {
+		result, err := mygo.Dialog.Message(mygo.MessageOptions{Parent: s.win, Message: "将「" + t.Name + "」移到回收站？", Detail: t.Path, Buttons: []string{"取消", "移到回收站"}})
+		if err != nil || result.Button != 1 {
+			return
+		}
+		s.update(func() {
+			if s.current != nil && s.current.Key() == t.Key() {
+				s.playID++
+				s.stop()
+				s.current = nil
+				s.loading = false
+			}
+		})
+		err = mygo.Shell.TrashItem(t.Path)
+		s.update(func() {
+			if err != nil {
+				s.status = "无法移到回收站: " + err.Error()
+				return
+			}
+			s.cfg.LocalFiles = slices.DeleteFunc(s.cfg.LocalFiles, func(path string) bool { return path == t.Path })
+			s.cfg.Favorites = slices.DeleteFunc(s.cfg.Favorites, func(track library.Track) bool { return track.Key() == t.Key() })
+			for i := range s.cfg.Playlists {
+				s.cfg.Playlists[i].Tracks = slices.DeleteFunc(s.cfg.Playlists[i].Tracks, func(track library.Track) bool { return track.Key() == t.Key() })
+			}
+			s.results = slices.DeleteFunc(s.results, func(track library.Track) bool { return track.Key() == t.Key() })
+			s.queue = slices.DeleteFunc(s.queue, func(track library.Track) bool { return track.Key() == t.Key() })
+			s.save()
+		})
+	}()
 }
 
 func (s *app) pickLocalFiles() {

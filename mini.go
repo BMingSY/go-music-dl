@@ -10,10 +10,10 @@ import (
 
 func (s *app) coverView(c *ui.Context, size float32) {
 	if s.cover != nil {
-		ui.Image(c, s.cover).Size(size, size).Fit(ui.Cover).Radius(7)
+		ui.Image(c, s.cover).Size(size, size).Fit(ui.Cover)
 		return
 	}
-	ui.Column(c).Size(size, size).Center().Background(accent).Radius(7).Children(func() { ui.Text(c, "♫").FontSize(size * 0.5).TextColor(ui.Hex("#ffffff")) })
+	ui.Column(c).Size(size, size).Center().Background(accent).Children(func() { ui.Text(c, "♫").FontSize(size * 0.5).TextColor(ui.Hex("#ffffff")) })
 }
 
 func (s *app) miniView(c *ui.Context) {
@@ -28,7 +28,7 @@ func (s *app) miniView(c *ui.Context) {
 			text, elapsed := s.miniCaption()
 			frameAt := c.Now()
 			ui.Box(c).Height(20).Label(text).Clip().Draw(func(p *ui.Painter, r ui.Rect) {
-				span := ui.Span{Text: text, Size: 12, Color: ui.Hex("#222222"), Weight: 400}
+				span := ui.Span{Text: text, Size: 12, Font: s.lyricFont(), Color: ui.Hex("#222222"), Weight: 400}
 				width, height := p.MeasureText(0, span)
 				shift := float32(0)
 				if s.playing && width > r.W {
@@ -45,14 +45,16 @@ func (s *app) miniView(c *ui.Context) {
 			}
 		})
 		ui.Row(c).Gap(0).AlignItems(ui.Center).Children(func() {
-			heart := iconButton(c, "favorite", "heart", "收藏当前歌曲", 23).OnClick(func() {
+			favorite := s.current != nil && s.isFavorite(*s.current)
+			color := muted
+			if favorite {
+				color = ui.Hex("#cb292f")
+			}
+			colorIconButton(c, "favorite", "heart", "收藏当前歌曲", 23, color, !favorite).OnClick(func() {
 				if s.current != nil {
 					s.favorite(*s.current)
 				}
 			})
-			if s.current != nil && s.isFavorite(*s.current) {
-				heart.Background(ui.Hex("#ffe4e6"))
-			}
 			play := "play"
 			if s.playing {
 				play = "pause"

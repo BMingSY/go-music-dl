@@ -306,7 +306,40 @@ func Description() string { return fmt.Sprintf("FFmpeg → PCM %d Hz → MyGo au
 
 // Remux copies audio packets and metadata into a standard container.
 func Remux(ctx context.Context, ffmpeg, input, output, title, artist, album string) error {
-	cmd := exec.CommandContext(ctx, ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", input, "-map", "0:a:0", "-vn", "-c:a", "copy", "-metadata", "title="+title, "-metadata", "artist="+artist, "-metadata", "album="+album, output)
+	return RemuxMetadata(ctx, ffmpeg, input, output, title, artist, album, "", nil)
+}
+
+func RemuxMetadata(ctx context.Context, ffmpeg, input, output, title, artist, album, lyric string, cover []byte) error {
+	args := []string{"-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", input}
+	ext := strings.ToLower(filepath.Ext(output))
+	attach := len(cover) > 0 && (ext == ".mp3" || ext == ".flac" || ext == ".m4a")
+	if attach {
+		f, err := os.CreateTemp("", "musicdl-cover-*")
+		if err != nil {
+			return err
+		}
+		defer os.Remove(f.Name())
+		_, err = f.Write(cover)
+		if closeErr := f.Close(); err == nil {
+			err = closeErr
+		}
+		if err != nil {
+			return err
+		}
+		args = append(args, "-i", f.Name())
+	}
+	args = append(args, "-map", "0:a:0", "-c:a", "copy", "-metadata", "title="+title, "-metadata", "artist="+artist, "-metadata", "album="+album)
+	if lyric != "" {
+		args = append(args, "-metadata", "lyrics="+lyric)
+	}
+	if attach {
+		args = append(args, "-map", "1:v:0", "-c:v", "mjpeg", "-disposition:v:0", "attached_pic", "-metadata:s:v", "title=Album cover", "-metadata:s:v", "comment=Cover (front)")
+	}
+	if ext == ".mp3" {
+		args = append(args, "-id3v2_version", "3")
+	}
+	args = append(args, output)
+	cmd := exec.CommandContext(ctx, ffmpeg, args...)
 	quietProcess(cmd)
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() != nil {

@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,11 +15,62 @@ import (
 	"github.com/egoist/mygo"
 )
 
+func (s *app) downloadToFolder(t library.Track) {
+	cfg := s.cfg
+	go func() {
+		err := func() error {
+			dir, err := os.MkdirTemp("", "musicdl-save-*")
+			if err != nil {
+				return err
+			}
+			defer os.RemoveAll(dir)
+			cfg.DownloadDir = dir
+			s.update(func() { s.status = "正在准备下载…" })
+			file, err := download.Fetch(s.ctx, t, cfg, nil)
+			if err != nil {
+				return err
+			}
+			output, err := mygo.Dialog.Save(mygo.SaveDialogOptions{Parent: s.win, Title: "保存音频", DefaultPath: t.Name + filepath.Ext(file)})
+			if err != nil || output == "" {
+				return err
+			}
+			in, err := os.Open(file)
+			if err != nil {
+				return err
+			}
+			defer in.Close()
+			out, err := os.CreateTemp(filepath.Dir(output), ".musicdl-save-*")
+			if err != nil {
+				return err
+			}
+			defer os.Remove(out.Name())
+			_, err = io.Copy(out, in)
+			if closeErr := out.Close(); err == nil {
+				err = closeErr
+			}
+			if err != nil {
+				return err
+			}
+			if err = os.Rename(out.Name(), output); err != nil {
+				return err
+			}
+			s.update(func() { s.status = "音频已保存" })
+			return nil
+		}()
+		if err != nil {
+			s.update(func() { s.status = fmt.Sprintf("保存音频失败: %v", err) })
+		}
+	}()
+}
+
 func (s *app) saveCurrentCover() {
 	if s.current == nil {
 		return
 	}
-	t, cfg := *s.current, s.cfg
+	s.saveCover(*s.current)
+}
+func (s *app) saveCover(t library.Track) {
+	cfg := s.cfg
 	go func() {
 		_, cover := library.Metadata(s.ctx, t, cfg)
 		if len(cover) == 0 {

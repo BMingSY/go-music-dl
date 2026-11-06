@@ -5,13 +5,13 @@ import (
 	"time"
 
 	"github.com/BMingSY/go-music-dl/internal/library"
-	"github.com/BMingSY/go-music-dl/internal/lyrics"
 	"github.com/egoist/mygo/ui"
 )
 
 func (s *app) lyricsView(c *ui.Context) {
 	w, h := c.Size()
-	size := min(w*.28, h*.48)
+	containerWidth := min(w, 1400)
+	size := min(450, max(250, min(w, h)*.45)) * .85
 	fontSize := s.cfg.LyricSize
 	if fontSize == 0 {
 		fontSize = 24
@@ -22,12 +22,11 @@ func (s *app) lyricsView(c *ui.Context) {
 			p.Fill(r, ui.RGBA(0, 0, 0, .55), 0)
 		}
 	}).Children(func() {
-		ui.Row(c).Fill().Padding(45, 55).Gap(60).Children(func() {
-			ui.Column(c).Width(w * .42).AlignItems(ui.Center).Gap(24).Children(func() {
-				ui.Spacer(c)
-				record := ui.Box(c).Size(size, size).Radius(size/2).Background(ui.Hex("#141414")).Border(2, ui.Hex("#282828"))
+		ui.Row(c).Absolute().Left((w-containerWidth)/2).Top(h*.05).Size(containerWidth, h*.9).Justify(ui.SpaceBetween).Children(func() {
+			ui.Column(c).Width(containerWidth * .45).FillHeight().AlignItems(ui.Center).Justify(ui.Center).Children(func() {
+				record := ui.Box(c).Size(size, size).Margin(0, 0, h*.04, 0).Radius(size/2).Background(ui.Hex("#111111")).Border(2, white.Alpha(.1)).Shadow(0, 0, h*.05, 0, ui.RGBA(0, 0, 0, .8))
 				if s.playing {
-					record.Rotate(float32(math.Mod(s.position.Seconds()*12, 360)))
+					record.Rotate(float32(math.Mod(s.position.Seconds()*15, 360)))
 				}
 				record.Draw(func(p *ui.Painter, r ui.Rect) {
 					for inset := float32(4); inset < r.W*.18; inset += 4 {
@@ -38,15 +37,14 @@ func (s *app) lyricsView(c *ui.Context) {
 						ui.Image(c, s.cover).Absolute().Left(size*.18).Top(size*.18).Size(size*.64, size*.64).Fit(ui.Cover).Radius(size)
 					}
 				})
-				ui.Spacer(c)
-				ui.Column(c).FillWidth().Padding(20).Gap(16).Radius(16).Background(ui.RGBA(0, 0, 0, .75)).Border(1, ui.Hex("#333333")).Children(func() {
+				ui.Column(c).Width(min(400, containerWidth*.45*.8)).Padding(15, 25).Margin(0, 0, h*.03, 0).Radius(12).Background(ui.RGBA(0, 0, 0, .65)).Border(1, white.Alpha(.15)).Shadow(0, 8, 20, 0, ui.RGBA(0, 0, 0, .5)).Children(func() {
 					name, artist := "等待播放", ""
 					if s.current != nil {
 						name = s.current.Name
 						artist = s.current.Artist
 					}
-					ui.Text(c, name).FontSize(32).Bold().TextColor(white).AlignSelf(ui.Center).SingleLine().Ellipsis("…")
-					ui.Text(c, artist).FontSize(20).TextColor(ui.Hex("#cccccc")).AlignSelf(ui.Center)
+					ui.Text(c, name).FontSize(min(32, max(20, w*.03))).FontWeight(800).LineHeight(1.2).TextColor(white).TextAlign(ui.Center).Margin(0, 0, 5, 0).MaxLines(2)
+					ui.Text(c, artist).FontSize(min(18, max(14, w*.015))).FontWeight(500).TextColor(white.Alpha(.9)).AlignSelf(ui.Center).Margin(0, 0, 15, 0)
 					ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
 						ui.Text(c, clockText(s.position)).FontSize(12).TextColor(white)
 						pos := s.position.Seconds()
@@ -55,43 +53,44 @@ func (s *app) lyricsView(c *ui.Context) {
 						}
 						ui.Text(c, clockText(s.duration)).FontSize(12).TextColor(white)
 					})
-					ui.Row(c).Gap(18).Justify(ui.Center).AlignItems(ui.Center).Children(func() {
-						iconButton(c, "prev", "prev", "上一首", 36).OnClick(func() { s.step(-1) })
+					ui.Row(c).Margin(15, 0, 0, 0).Justify(ui.Center).AlignItems(ui.Center).Children(func() {
+						colorIconButton(c, "prev", "prev", "上一首", 28, white.Alpha(.8), false).Background(ui.Transparent).OnClick(func() { s.step(-1) })
 						name := "play"
 						if s.playing {
 							name = "pause"
 						}
-						iconButton(c, "toggle", name, "播放或暂停", 44).OnClick(s.toggle)
-						iconButton(c, "next", "next", "下一首", 36).OnClick(func() { s.step(1) })
+						colorIconButton(c, "toggle", name, "播放或暂停", 40, white, false).MarginX(8).Background(white.Alpha(.15)).OnClick(s.toggle)
+						colorIconButton(c, "next", "next", "下一首", 28, white.Alpha(.8), false).Background(ui.Transparent).OnClick(func() { s.step(1) })
 						v := s.cfg.Volume
-						glyph(c, "volume", 16, white)
-						if ui.Slider(c, &v, 0, 1).Width(80).Label("歌词页音量").Changed() {
+						glyph(c, "volume", 16, white).Margin(0, 8, 0, 20)
+						if ui.Slider(c, &v, 0, 1).Width(65).Label("歌词页音量").Changed() {
 							s.volume(v)
 						}
 					})
 				})
-				ui.Text(c, s.status).FontSize(12).TextColor(white).MaxLines(2)
+				if s.status != "" {
+					ui.Text(c, s.status).FontSize(12).TextColor(white).MaxLines(2)
+				}
 				ui.Row(c).Gap(16).Justify(ui.Center).Children(func() {
-					iconButton(c, "cover", "image", "保存封面", 48).OnClick(s.saveCurrentCover)
-					iconButton(c, "audio", "music", "下载音频", 48).OnClick(func() {
+					colorIconButton(c, "cover", "image", "保存封面", 50, white, true).Background(ui.RGBA(0, 0, 0, .7)).Border(1, white.Alpha(.4)).OnClick(s.saveCurrentCover)
+					colorIconButton(c, "audio", "music", "下载音频", 50, white, false).Background(ui.RGBA(0, 0, 0, .7)).Border(1, white.Alpha(.4)).OnClick(func() {
 						if s.current != nil {
 							s.addDownloads([]library.Track{*s.current})
 						}
 					})
-					iconButton(c, "lrc", "file", "保存歌词", 48).OnClick(func() {
+					colorIconButton(c, "lrc", "file", "保存歌词", 50, white, false).Background(ui.RGBA(0, 0, 0, .7)).Border(1, white.Alpha(.4)).OnClick(func() {
 						if s.current != nil {
 							s.saveLyrics(*s.current)
 						}
 					})
-					ui.Button(c, "导出视频").Radius(24).Height(48).OnClick(s.exportVideo)
+					ui.Button(c, "导出视频").Radius(30).Padding(12, 30).TextColor(white).Background(ui.RGBA(0, 0, 0, .7)).Border(1, white.Alpha(.4)).OnClick(s.exportVideo)
 				})
 			})
-			ui.Column(c).Grow(1).Gap(24).Children(func() {
-				ui.Text(c, "LYRICS PREVIEW").FontSize(16).FontWeight(700).TextColor(white).Padding(8, 12).Border(1, ui.Hex("#333333")).Radius(5).AlignSelf(ui.Start)
+			ui.Column(c).Width(containerWidth*.5).FillHeight().Padding(0, 0, 0, 40).Gap(h * .02).Children(func() {
+				ui.Text(c, "LYRICS PREVIEW").FontSize(12).LetterSpacing(2).FontWeight(700).TextColor(white.Alpha(.9)).Background(ui.RGBA(0, 0, 0, .6)).Padding(5, 10).Border(1, white.Alpha(.1)).Radius(4).AlignSelf(ui.Start)
 				if len(s.lines) == 0 {
 					ui.Text(c, "暂无歌词").FontSize(fontSize).TextColor(ui.Hex("#cccccc")).MarginY(90)
 				} else {
-					text, _ := lyrics.Current(s.lines, s.position)
 					idx := -1
 					for i, line := range s.lines {
 						if line.At <= s.position {
@@ -103,19 +102,22 @@ func (s *app) lyricsView(c *ui.Context) {
 						s.lastLyric = idx
 					}
 					ui.Scroll(c).Grow(1).TrackScroll(&s.lyricScroll).Children(func() {
-						ui.Column(c).Gap(34).Padding(45, 0, h*.3, 0).Children(func() {
-							for _, line := range s.lines {
+						ui.Column(c).Padding(45, 10, h*.3, 0).Children(func() {
+							for i, line := range s.lines {
 								color := ui.Hex("#999999")
-								if line.Text == text {
+								if i == idx {
 									color = white
 								}
-								ui.Text(c, line.Text).FontSize(fontSize).Bold().TextColor(color).OnClick(func() { s.seek(line.At) })
+								item := ui.Text(c, line.Text).Font(s.lyricFont()).FontSize(fontSize).FontWeight(600).LineHeight(1.6).TextColor(color).Padding(h*.015, 10).Radius(8).OnClick(func() { s.seek(line.At) })
+								if i == idx {
+									item.FontWeight(800).Padding(h*.015, 10, h*.015, 20).Background(ui.RGBA(0, 0, 0, .65)).Border(1, white.Alpha(.1)).Shadow(0, 6, 15, 0, ui.RGBA(0, 0, 0, .5))
+								}
 							}
 						})
 					})
 				}
 			})
 		})
-		iconButton(c, "close-lyrics", "close", "关闭歌曲详情", 44).Absolute().Right(25).Top(25).OnClick(func() { s.lyricOpen = false })
+		colorIconButton(c, "close-lyrics", "close", "关闭歌曲详情", 40, white, false).Background(ui.RGBA(0, 0, 0, .6)).Border(1, white.Alpha(.3)).Absolute().Right(20).Top(20).OnClick(func() { s.lyricOpen = false })
 	})
 }

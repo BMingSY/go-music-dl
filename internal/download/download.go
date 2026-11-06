@@ -151,13 +151,25 @@ func save(ctx context.Context, r library.Resolved, cfg library.Config, progress 
 		progress(done, max(size, done))
 	}
 	staged := f.Name()
+	var lyric string
+	var cover []byte
+	if cfg.EmbedMetadata || cfg.SaveLyrics {
+		lyric, cover = library.Metadata(ctx, r.Track, cfg)
+	}
 	// Bilibili delivers fragmented MP4; remux it to a seekable M4A, without
 	// transcoding. For other sources this also records title/artist/album tags.
 	ffmpeg, e := playback.FindFFmpeg(cfg.FFmpeg)
 	if e == nil {
 		tagged := f.Name() + "." + ext
 		defer os.Remove(tagged)
-		e = playback.Remux(ctx, ffmpeg, staged, tagged, r.Track.Name, r.Track.Artist, r.Track.Album)
+		if cfg.EmbedMetadata {
+			e = playback.RemuxMetadata(ctx, ffmpeg, staged, tagged, r.Track.Name, r.Track.Artist, r.Track.Album, lyric, cover)
+			if e != nil && ctx.Err() == nil {
+				e = playback.Remux(ctx, ffmpeg, staged, tagged, r.Track.Name, r.Track.Artist, r.Track.Album)
+			}
+		} else {
+			e = playback.Remux(ctx, ffmpeg, staged, tagged, r.Track.Name, r.Track.Artist, r.Track.Album)
+		}
 		if e == nil {
 			staged = tagged
 		} else if r.Track.Source == "bilibili" {
@@ -172,9 +184,8 @@ func save(ctx context.Context, r library.Resolved, cfg library.Config, progress 
 	if err = commit(staged, final); err != nil {
 		return "", err
 	}
-	lyric, cover := library.Metadata(ctx, r.Track, cfg)
 	if ctx.Err() == nil {
-		if lyric != "" {
+		if cfg.SaveLyrics && lyric != "" {
 			_ = writeSidecar(filepath.Join(cfg.DownloadDir, name+".lrc"), []byte(lyric))
 		}
 		if len(cover) > 0 {

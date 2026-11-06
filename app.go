@@ -25,6 +25,12 @@ import (
 )
 
 type app struct {
+	queueOpen, playerVolumeOpen, speedOpen        bool
+	speed                                         float64
+	queryFocused                                  bool
+	captureShortcut                               string
+	songMenu                                      string
+	songMenuOpen, toolsOpen                       bool
 	miniVolumeOpen                                bool
 	selected                                      map[string]bool
 	searchKind                                    string
@@ -78,7 +84,13 @@ type app struct {
 }
 
 func newApp(ctx context.Context, cfg library.Config, path string) *app {
-	return &app{ctx: ctx, cfg: cfg, configPath: path, source: "netease", page: "library", queueIndex: -1,
+	if cfg.LyricSize < 14 {
+		cfg.LyricSize = 24
+	}
+	if cfg.Shortcuts == nil {
+		cfg.Shortcuts = defaultShortcuts()
+	}
+	return &app{ctx: ctx, cfg: cfg, configPath: path, source: "netease", page: "library", queueIndex: -1, speed: 1,
 		selected: map[string]bool{"netease": true, "bilibili": true}, searchKind: "song", pageNumber: 1, settingsTab: "general", checked: map[string]bool{}, images: map[string]*ui.Bitmap{}, imagePending: map[string]bool{}, imageSlots: make(chan struct{}, 6), lastLyric: -1,
 	}
 }
@@ -281,6 +293,7 @@ func (s *app) play(index int, tracks []library.Track) {
 			s.recordHistory(track)
 			p := s.player
 			p.SetVolume(s.cfg.Volume)
+			p.SetSpeed(s.speed)
 			p.OnEnd(func() {
 				s.update(func() {
 					if id != s.playID || s.player != p {
@@ -307,6 +320,9 @@ func (s *app) play(index int, tracks []library.Track) {
 			})
 			p.Play()
 			s.playing = true
+			if s.cfg.FloatingLyrics && s.mini != nil {
+				s.mini.Show()
+			}
 			mygo.NowPlaying.Set(mygo.NowPlayingInfo{Title: track.Name, Artist: track.Artist, Album: track.Album, Duration: s.duration, Commands: mygo.MediaPlay | mygo.MediaPause | mygo.MediaNext | mygo.MediaPrevious | mygo.MediaSeek})
 			s.syncMedia()
 		})
