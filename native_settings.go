@@ -244,6 +244,6 @@ func (s *app) lyricFont() string {
 		}
 		return "KaiTi"
 	default:
-		return ""
+		return desktopFont()
 	}
 }

@@ -16,6 +16,13 @@ var textColor = ui.Hex("#2d3748")
 var muted = ui.Hex("#718096")
 var border = ui.Hex("#e2e8f0")
 
+func desktopFont() string {
+	if runtime.GOOS == "windows" {
+		return "Segoe UI, Microsoft YaHei, Meiryo, Segoe UI Emoji"
+	}
+	return "system-ui"
+}
+
 func (s *app) view(c *ui.Context) {
 	initAssets()
 	theme := ui.LightTheme()
@@ -24,9 +31,7 @@ func (s *app) view(c *ui.Context) {
 	theme.TextMuted = muted
 	theme.Border = border
 	theme.FontSize = 16
-	if runtime.GOOS == "windows" {
-		theme.Font = "Segoe UI"
-	}
+	theme.Font = desktopFont()
 	c.SetTheme(theme)
 	w, h := c.Size()
 	ui.Box(c).Fill().Background(ui.Hex("#eef2f5")).Draw(func(p *ui.Painter, r ui.Rect) {
@@ -75,7 +80,7 @@ func (s *app) searchBox(c *ui.Context) {
 			}
 		})
 		ui.Row(c).Gap(10).Margin(0, 0, 25, 0).Children(func() {
-			input := ui.TextInput(c.Key("query"), &s.query).Label("搜索关键词").Placeholder("输入关键词或粘贴链接，支持单曲 / 歌单 / 专辑").Grow(1).Height(50).Padding(14, 24).Radius(50).Border(2, border).Background(ui.Hex("#f8fafc")).FontSize(16)
+			input := ui.TextInput(c.Key("query"), &s.query).Label("搜索关键词").Placeholder("输入关键词或粘贴链接，支持单曲 / 歌单 / 专辑").PlaceholderColor(ui.Hex("#757575")).Grow(1).Height(50).Padding(14, 24).Radius(50).Border(2, border).Background(ui.Hex("#f8fafc")).FontSize(16)
 			s.queryFocused = input.Focused()
 			if input.Submitted() {
 				s.search()

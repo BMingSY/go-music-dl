@@ -20,6 +20,7 @@ func (s *app) miniView(c *ui.Context) {
 	initAssets()
 	theme := ui.LightTheme()
 	theme.FontSize = 12
+	theme.Font = desktopFont()
 	c.SetTheme(theme)
 	ui.Row(c.Key("mini")).Fill().Padding(4).Gap(8).AlignItems(ui.Center).Background(white).Border(1, ui.Hex("#eeeeee")).Children(func() {
 		box := ui.Box(c.Key("cover-drag")).Size(40, 40).DragWindow()
