@@ -42,4 +42,8 @@ go vet ./...
 MUSIC_DL_REQUIRE_AUDIO_TESTS=1 go test -race ./...
 ```
 
+GitHub Actions 会在向 `custom` 提交 PR 或推送合并结果时，分别在 Windows x64、macOS Intel 和 Apple Silicon 上运行格式检查、`go vet`、带 FFmpeg 的竞态测试、更新安装冒烟、界面渲染和原生窗口冒烟。界面截图与冒烟结果保留为 CI artifacts。CI 不依赖音频输出设备，音频解码由 FFmpeg 集成测试验证。
+
+PR/MR 标题须使用 `feat:`、`fix:`、`ci:` 等 Conventional Commits 前缀，修改标题时会重新校验。完整媒体工具构建和安装包流程独立保留，仅在推送 `native-v*` 标签或手动运行 **Desktop packages** 时触发；日常测试也可以手动运行 **CI**。
+
 基于 [go-music-dl](https://github.com/guohuiyuan/go-music-dl) 和 [music-lib](https://github.com/guohuiyuan/music-lib)，界面使用 [MyGo](https://github.com/egoist/mygo)。遵循 [AGPL-3.0](LICENSE) 许可。
