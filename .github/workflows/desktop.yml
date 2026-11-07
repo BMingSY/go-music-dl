@@ -29,6 +29,13 @@ jobs:
           go-version-file: go.mod
       - name: Validate GitHub Actions workflows
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
+      - name: Check Go formatting
+        run: |
+          unformatted=$(gofmt -l cmd internal tools)
+          if [[ -n "$unformatted" ]]; then
+            printf '%s\n' "$unformatted"
+            exit 1
+          fi
 
   test:
     name: Test (${{ matrix.target }})
@@ -88,13 +95,6 @@ jobs:
                   with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as env:
                       env.write(f'MUSIC_DL_TEST_FFMPEG={path}\n')
           PY
-      - name: Check Go formatting
-        run: |
-          unformatted=$(gofmt -l cmd internal tools)
-          if [[ -n "$unformatted" ]]; then
-            printf '%s\n' "$unformatted"
-            exit 1
-          fi
       - name: Go vet
         run: go vet ./...
       - name: Race tests with FFmpeg
