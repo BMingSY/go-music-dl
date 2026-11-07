@@ -115,6 +115,36 @@ func runSmoke(s *app, dir, file string) error {
 			return err
 		}
 	}
+	if file != "" {
+		var savedPosition time.Duration
+		mygo.RunOnMain(func() {
+			s.position = s.player.Position()
+			savedPosition = s.position
+			if e := s.savePlayback(); e != nil {
+				err = e
+				return
+			}
+			s.stop()
+			s.current = nil
+			s.queue = nil
+			s.queueIndex = -1
+			s.position = 0
+			s.restorePlayback()
+			if s.current == nil || s.player != nil || s.playing || absDuration(s.position-savedPosition) > time.Millisecond {
+				err = fmt.Errorf("saved playback did not restore paused at its previous position")
+				return
+			}
+			s.toggle()
+		})
+		if err != nil {
+			return err
+		}
+		if e := waitSmoke(s, func() bool {
+			return s.player != nil && s.player.Playing() && s.player.Position() > savedPosition+200*time.Millisecond
+		}); e != nil {
+			return fmt.Errorf("resume saved playback: %w", e)
+		}
+	}
 	mygo.RunOnMain(func() { s.win.Show() })
 	time.Sleep(300 * time.Millisecond)
 	for name, w := range map[string]*mygo.Window{"main": s.win, "mini": s.mini} {
@@ -127,6 +157,13 @@ func runSmoke(s *app, dir, file string) error {
 		}
 	}
 	return nil
+}
+
+func absDuration(d time.Duration) time.Duration {
+	if d < 0 {
+		return -d
+	}
+	return d
 }
 
 func waitSmoke(s *app, ready func() bool) error {

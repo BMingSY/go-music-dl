@@ -10,6 +10,34 @@ import (
 	"os"
 )
 
+func (s *app) previewActions(c *ui.Context) {
+	ui.Row(c).Gap(12).Justify(ui.Center).Children(func() {
+		s.modeButton(c, "detail-play-mode", "歌词页播放模式：", 44, white).Background(ui.RGBA(0, 0, 0, .65)).Border(1, white.Alpha(.35))
+		more := colorIconButton(c, "preview-more", "more", "歌词页更多操作", 44, white, false).Background(ui.RGBA(0, 0, 0, .65)).Border(1, white.Alpha(.35))
+		buttonMotion(more, 1.1, 0)
+		if more.Clicked() {
+			s.previewActionsOpen = !s.previewActionsOpen
+		}
+		ui.PopoverBase(c, more, &s.previewActionsOpen, func(panel ui.Element) {
+			panel.Width(192).Padding(6).Radius(12).Background(ui.RGBA(15, 23, 42, .95)).Border(1, white.Alpha(.25)).Margin(8, 0).Transition(panelTransition)
+			ui.Column(c).Gap(3).Children(func() {
+				for _, action := range []struct {
+					icon, label string
+					run         func()
+				}{{"image", "更换封面或背景", s.replacePreviewCover}, {"music", "更换本地音频", s.replacePreviewAudio}, {"file", "更换本地歌词", s.replacePreviewLyrics}, {"clapper", "导出视频", s.exportVideo}} {
+					button := ui.Button(c.Key(action.label), "").Label(action.label).FillWidth().Height(36).Padding(8, 10).Radius(8).Border(0, ui.Transparent).Background(ui.Transparent).OnClick(func() { s.previewActionsOpen = false; action.run() })
+					if button.Hovered() {
+						button.Background(white.Alpha(.12))
+					}
+					button.Children(func() {
+						ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() { glyph(c, action.icon, 14, white); ui.Text(c, action.label).FontSize(13).TextColor(white) })
+					})
+				}
+			})
+		})
+	})
+}
+
 func detailSlider(c *ui.Context, label string, value *float64, hi float64) ui.Element {
 	e := ui.SliderBase(c, value, 0, hi).Label(label).Height(16)
 	at := float32(max(0, min(1, *value/hi)))

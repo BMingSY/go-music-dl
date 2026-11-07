@@ -439,7 +439,5 @@ func (s *app) cycleMode() {
 			break
 		}
 	}
-	labels := map[string]string{"": "顺序播放", "loop": "列表循环", "one": "单曲循环", "shuffle": "随机播放"}
-	s.status = labels[s.cfg.PlayMode]
 	s.save()
 }

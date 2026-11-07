@@ -15,12 +15,15 @@ func TestMiniCoverBlankControlsAndDrag(t *testing.T) {
 	restored := 0
 	tt := ui.NewTester(func(c *ui.Context) { s.miniContent(c, func() { restored++ }) }, 236, 50)
 	// Cover, top padding and the free space between buttons all open main.
-	for _, point := range []ui.Point{{X: 20, Y: 25}, {X: 130, Y: 2}, {X: 48, Y: 25}} {
+	for index, point := range []ui.Point{{X: 20, Y: 25}, {X: 130, Y: 2}, {X: 48, Y: 25}, {X: 126, Y: 25}, {X: 130, Y: 48}} {
 		tt.ClickAt(point.X, point.Y)
 		tt.Advance(time.Second)
+		if restored != index+1 {
+			t.Fatalf("click at %v did not restore main; restores=%d", point, restored)
+		}
 	}
-	if restored != 3 {
-		t.Fatalf("cover/background restored main %d times, want 3", restored)
+	if restored != 5 {
+		t.Fatalf("cover/background restored main %d times, want 5", restored)
 	}
 	if _, ok := tt.Find("打开主窗口"); !ok {
 		t.Fatal("background has no accessible restore action")
@@ -30,18 +33,20 @@ func TestMiniCoverBlankControlsAndDrag(t *testing.T) {
 		if err := tt.Click(label); err != nil {
 			t.Fatal(err)
 		}
-		if restored != 3 {
+		if restored != 5 {
 			t.Fatalf("%s also opened the main window", label)
 		}
 	}
-	tt.Press(20, 25)
-	tt.Move(35, 30)
-	tt.Release(35, 30)
-	if s.miniDrag.pressed || restored != 3 {
-		t.Fatalf("drag was treated as a click: moved=%v restores=%d", s.miniDrag.moved, restored)
+	for _, point := range []ui.Point{{X: 20, Y: 25}, {X: 130, Y: 2}, {X: 48, Y: 25}, {X: 126, Y: 25}, {X: 130, Y: 48}} {
+		tt.Press(point.X, point.Y)
+		tt.Move(point.X+15, point.Y+5)
+		tt.Release(point.X+15, point.Y+5)
+		if s.miniDrag.pressed || restored != 5 {
+			t.Fatalf("drag at %v was treated as a click: restores=%d", point, restored)
+		}
 	}
 	tt.ClickAt(20, 25)
-	if restored != 4 {
+	if restored != 6 {
 		t.Fatal("a click after dragging did not open main")
 	}
 }

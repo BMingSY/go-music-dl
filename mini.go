@@ -32,7 +32,7 @@ func (s *app) showMain() {
 }
 
 func miniButton(c *ui.Context, key, icon, label string, size float32) ui.Element {
-	button := ui.Button(c.Key(key), "").Label(label).Size(size, size).Padding(0).Radius(size/2).Border(0, ui.Transparent).Background(ui.Transparent)
+	button := ui.Button(c.Key(key), "").Label(label).Size(size, size).Padding(0).Radius(size/2).Border(0, ui.Transparent).Background(ui.Transparent).HandleInput(miniControlInput)
 	color := muted
 	if button.Hovered() {
 		button.Background(ui.Hex("#ecfdf5"))
@@ -51,20 +51,18 @@ func (s *app) miniContent(c *ui.Context, restore func()) {
 	theme.Font = desktopFont()
 	c.SetTheme(theme)
 	root := ui.Box(c.Key("mini")).Fill().Lang("zh-CN").Background(white).Radius(6).Border(1, ui.Hex("#e2e8f0"))
+	root.Label("打开主窗口").Role(ui.RoleGroup).HandleInput(s.miniSurfaceInput).OnClick(func() {
+		moved := s.miniDrag.moved
+		s.miniDrag.moved = false
+		if !moved {
+			restore()
+		}
+	})
 	hovered := root.Hovered()
 	if !hovered {
 		s.miniVolumeOpen = false
 	}
 	root.Children(func() {
-		// Keep the drag/click surface separate from the controls so their
-		// clicks cannot also open the main window.
-		ui.Box(c.Key("mini-surface")).Absolute().Fill().Label("打开主窗口").Role(ui.RoleButton).HandleInput(s.miniSurfaceInput).OnClick(func() {
-			moved := s.miniDrag.moved
-			s.miniDrag.moved = false
-			if !moved {
-				restore()
-			}
-		})
 		ui.Row(c).Fill().Padding(5).Gap(8).AlignItems(ui.Center).PassThrough().Children(func() {
 			ui.Box(c).Size(38, 38).Radius(3).Clip().Children(func() { s.coverView(c, 38) })
 			caption := ui.Column(c.Key("caption")).Grow(1).Gap(1).Clip()
@@ -112,14 +110,18 @@ func (s *app) miniContent(c *ui.Context, restore func()) {
 		if s.miniVolumeOpen {
 			ui.Row(c).Absolute().Left(57).Right(8).Bottom(1).Height(15).Background(white).Gap(4).AlignItems(ui.Center).Children(func() {
 				v := s.cfg.Volume
-				if slimSlider(c, "悬浮窗音量", &v, 1).Grow(1).Changed() {
+				if slimSlider(c, "悬浮窗音量", &v, 1).Grow(1).HandleInput(miniControlInput).Changed() {
 					s.volume(v)
 				}
-				ui.Button(c, "完成").FontSize(10).Padding(0).Height(15).OnClick(func() { s.miniVolumeOpen = false })
+				ui.Button(c, "完成").FontSize(10).Padding(0).Height(15).HandleInput(miniControlInput).OnClick(func() { s.miniVolumeOpen = false })
 			})
 		}
 	})
 }
+
+// Let controls use their normal input handling instead of the surrounding
+// surface's window-drag handler. Gaps between controls still belong to it.
+func miniControlInput(ui.InputEvent) bool { return false }
 
 type miniDragState struct {
 	pressed, moved   bool

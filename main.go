@@ -67,6 +67,7 @@ func main() {
 		message := "PASS: native windows, capture, tray lifecycle, close-to-hide\n"
 		if *smokeAudio != "" {
 			message += "PASS: native audio output, playback, pause, seek, hidden-window playback\n"
+			message += "PASS: saved queue and position restore paused; pressing play resumes from the saved position\n"
 		}
 		if err := os.WriteFile(filepath.Join(*smoke, "result.txt"), []byte(message), 0600); err != nil {
 			log.Fatal(err)

@@ -25,6 +25,7 @@ import (
 
 type app struct {
 	miniDrag                                                          miniDragState
+	playbackSaved                                                     time.Time
 	utilityPage                                                       int
 	downloadTab, downloadFilter                                       string
 	toastSeen                                                         string
@@ -40,6 +41,9 @@ type app struct {
 	importLink                                                        string
 	importBusy                                                        bool
 	queueOpen, playerVolumeOpen, speedOpen                            bool
+	queueScroll                                                       ui.ScrollState
+	queueReveal                                                       bool
+	previewActionsOpen                                                bool
 	speed                                                             float64
 	queryFocused                                                      bool
 	captureShortcut                                                   string
@@ -103,9 +107,11 @@ func newApp(ctx context.Context, cfg library.Config, path string) *app {
 	if cfg.Shortcuts == nil {
 		cfg.Shortcuts = defaultShortcuts()
 	}
-	return &app{ctx: ctx, cfg: cfg, configPath: path, source: "netease", page: "library", queueIndex: -1, speed: 1,
+	s := &app{ctx: ctx, cfg: cfg, configPath: path, source: "netease", page: "library", queueIndex: -1, speed: 1,
 		selected: map[string]bool{"netease": true, "bilibili": true}, searchKind: "song", pageNumber: 1, settingsTab: "general", checked: map[string]bool{}, images: map[string]*ui.Bitmap{}, imagePending: map[string]bool{}, imageSlots: make(chan struct{}, 6), lastLyric: -1,
 	}
+	s.restorePlayback()
+	return s
 }
 
 func (s *app) ready() {
@@ -212,6 +218,9 @@ func (s *app) tick() {
 	}
 	s.position = s.player.Position()
 	s.playing = s.player.Playing()
+	if s.playing && time.Since(s.playbackSaved) >= 10*time.Second {
+		_ = s.savePlayback()
+	}
 	if err := audio.Err(); err != nil {
 		s.status = "音频输出不可用，请检查系统声音设备。"
 	}
@@ -229,6 +238,8 @@ func (s *app) toggleMini() {
 func (s *app) save() {
 	if err := library.SaveConfig(s.configPath, s.cfg); err != nil {
 		s.status = "保存设置失败: " + err.Error()
+	} else if err := s.savePlayback(); err != nil {
+		s.status = "保存播放进度失败: " + err.Error()
 	}
 }
 
@@ -248,6 +259,10 @@ func (s *app) selectSource(source string) {
 }
 
 func (s *app) play(index int, tracks []library.Track) {
+	s.playFrom(index, tracks, 0)
+}
+
+func (s *app) playFrom(index int, tracks []library.Track, position time.Duration) {
 	if index < 0 || index >= len(tracks) {
 		return
 	}
@@ -263,7 +278,7 @@ func (s *app) play(index int, tracks []library.Track) {
 	s.playerExpanded = true
 	s.cover = nil
 	s.lines = nil
-	s.position = 0
+	s.position = resumePosition(position, time.Duration(track.Duration)*time.Second)
 	s.duration = time.Duration(track.Duration) * time.Second
 	s.loading = true
 	s.status = "正在准备播放…"
@@ -307,6 +322,10 @@ func (s *app) play(index int, tracks []library.Track) {
 			s.decoder = d
 			s.player = audio.NewPlayer(d)
 			s.duration = input.Duration
+			s.position = resumePosition(position, s.duration)
+			if s.position > 0 {
+				d.Seek(func() { s.player.Seek(s.position) })
+			}
 			s.loading = false
 			s.status = ""
 			s.recordHistory(track)
@@ -391,6 +410,9 @@ func (s *app) stop() {
 }
 func (s *app) toggle() {
 	if s.player == nil {
+		if !s.loading && s.current != nil && s.queueIndex >= 0 && s.queueIndex < len(s.queue) {
+			s.playFrom(s.queueIndex, s.queue, s.position)
+		}
 		return
 	}
 	if s.player.Playing() {
@@ -399,16 +421,20 @@ func (s *app) toggle() {
 		s.player.Play()
 	}
 	s.playing = s.player.Playing()
+	_ = s.savePlayback()
 	s.syncMedia()
 	s.redraw()
 }
 func (s *app) seek(pos time.Duration) {
-	if s.player == nil || s.decoder == nil || s.duration <= 0 {
+	if s.current == nil || s.duration <= 0 {
 		return
 	}
 	pos = max(0, min(s.duration, pos))
-	s.decoder.Seek(func() { s.player.Seek(pos) })
+	if s.decoder != nil && s.player != nil {
+		s.decoder.Seek(func() { s.player.Seek(pos) })
+	}
 	s.position = pos
+	_ = s.savePlayback()
 	s.syncMedia()
 	s.redraw()
 }

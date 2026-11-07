@@ -2,7 +2,7 @@
   "name": "music-dl",
   "slug": "music-dl",
   "identifier": "io.github.bmingsy.musicdl",
-  "version": "0.1.1-dev.2",
+  "version": "0.1.1-dev.3",
   "out": "dist",
   "windows": {
     "displayName": "music-dl",
