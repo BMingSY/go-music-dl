@@ -127,10 +127,12 @@ jobs:
           PY
       - name: Render UI and run native window smoke
         env:
-          MUSIC_DL_PREVIEW_DIR: artifacts/render
+          MUSIC_DL_PREVIEW_DIR: ${{ github.workspace }}/artifacts/render
           SMOKE_TARGET: ${{ matrix.target }}
         run: |
           go test -run TestRenderPreview -count=1 ./internal/desktop
+          test -s artifacts/render/main.png
+          test -s artifacts/render/mini.png
           mkdir -p artifacts/smoke
           if [[ "$RUNNER_OS" == macOS && "$SMOKE_TARGET" == "$(go env GOOS)-$(go env GOARCH)" ]]; then
             app_binary=$(find dist -path '*.app/Contents/MacOS/*' -type f | head -1)

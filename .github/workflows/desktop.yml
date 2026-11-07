@@ -126,8 +126,11 @@ jobs:
         run: go run ./tools/test-update
       - name: Render desktop UI
         env:
-          MUSIC_DL_PREVIEW_DIR: artifacts/render
-        run: go test -run TestRenderPreview -count=1 ./internal/desktop
+          MUSIC_DL_PREVIEW_DIR: ${{ github.workspace }}/artifacts/render
+        run: |
+          go test -run TestRenderPreview -count=1 ./internal/desktop
+          test -s artifacts/render/main.png
+          test -s artifacts/render/mini.png
       - name: Native window smoke
         run: |
           mkdir -p artifacts/smoke
