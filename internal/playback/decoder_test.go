@@ -1,8 +1,10 @@
 package playback
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
+	"fmt"
 	"io"
 	"math"
 	"net/http"
@@ -10,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -121,6 +124,68 @@ func TestHTTPPlaybackSendsHeadersAndSeeks(t *testing.T) {
 	}
 	if n, err := d.Read(make([]float32, 2048)); n == 0 || err != nil {
 		t.Fatalf("n=%d err=%v decoder=%v", n, err, d.Err())
+	}
+}
+
+func TestTruncatedHTTPAudioIsNotSuccessfulEnd(t *testing.T) {
+	ffmpeg := testFFmpeg(t)
+	data, err := os.ReadFile(fixture(t, ffmpeg, "wav"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var complete atomic.Bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if complete.Load() {
+			http.ServeContent(w, r, "audio.wav", time.Time{}, bytes.NewReader(data))
+			return
+		}
+		// The HTTP response completes normally, but its WAV header still
+		// describes four seconds. FFmpeg can exit successfully after one.
+		w.Header().Set("Content-Type", "audio/wav")
+		w.Header().Set("Content-Length", fmt.Sprint(len(data)/4))
+		_, _ = w.Write(data[:len(data)/4])
+	}))
+	defer server.Close()
+	d, err := Open(ffmpeg, Input{Location: server.URL + "/audio.wav", Duration: 4 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	buf := make([]float32, 4096)
+	total := 0
+	for {
+		n, err := d.Read(buf)
+		total += n
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if total == 0 || total >= 2*Rate*2 {
+		t.Fatalf("fixture did not end early: %d samples", total)
+	}
+	if d.Err() == nil {
+		t.Fatal("truncated audio was reported as a successful end; the playlist would skip to the next song")
+	}
+	complete.Store(true)
+	if err := d.SetPosition(2 * Rate); err != nil {
+		t.Fatal(err)
+	}
+	total = 0
+	for {
+		n, err := d.Read(buf)
+		total += n
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if d.Err() != nil || total < 2*Rate*19/10 || total > 2*Rate*21/10 {
+		t.Fatalf("reopened stream did not finish normally after seeking: samples=%d err=%v", total, d.Err())
 	}
 }
 

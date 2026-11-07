@@ -31,10 +31,11 @@ type Input struct {
 }
 
 type process struct {
-	cmd  *exec.Cmd
-	out  io.ReadCloser
-	done chan struct{}
-	err  error // published by closing done
+	cmd           *exec.Cmd
+	out           io.ReadCloser
+	start, frames int64 // seek offset and decoded frames, protected by Decoder.mu
+	done          chan struct{}
+	err           error // published by closing done
 }
 
 func (p *process) stop() {
@@ -155,7 +156,7 @@ func (d *Decoder) start(frame int64) (*process, error) {
 		return nil, errors.New("无法启动 FFmpeg 解码器")
 	}
 	writer.Close()
-	p := &process{cmd: cmd, out: out, done: make(chan struct{})}
+	p := &process{cmd: cmd, out: out, start: max(0, frame), done: make(chan struct{})}
 	go func() { p.err = cmd.Wait(); close(p.done) }()
 	return p, nil
 }
@@ -207,11 +208,25 @@ func (d *Decoder) Read(samples []float32) (int, error) {
 	d.analysis.capture(p, samples[:count])
 	if err != nil {
 		<-p.done
-		d.mu.Lock()
-		if d.proc == p && !d.closed && p.err != nil {
-			d.lastErr = errors.New("音频解码失败，请检查文件、来源权限或网络连接")
+	}
+	d.mu.Lock()
+	if d.proc == p && !d.closed {
+		p.frames += int64(count / 2)
+		if err != nil {
+			length := d.Len()
+			switch {
+			case p.err != nil:
+				d.lastErr = errors.New("音频解码失败，请检查文件、来源权限或网络连接")
+			case p.frames == 0 && (length < 0 || p.start < length), length > p.start+p.frames+2*Rate:
+				// FFmpeg may exit 0 after a partial HTTP response. Count PCM
+				// frames rather than trusting its exit status or wall time.
+				// Allow for rounded provider durations and codec padding.
+				d.lastErr = errors.New("音频流提前中断，请点击播放从当前位置重试")
+			}
 		}
-		d.mu.Unlock()
+	}
+	d.mu.Unlock()
+	if err != nil {
 		return count, io.EOF
 	}
 	return count, nil
