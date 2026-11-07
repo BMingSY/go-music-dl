@@ -45,6 +45,7 @@ func (s *app) browse(kind, source, id string) {
 	s.pageNumber = 1
 	s.scroll = ui.ScrollState{}
 	s.collectionTitle = ""
+	s.currentCollection = nil
 	s.collectionKind = kind
 	s.collectionID = id
 	cfg, query := s.cfg, strings.TrimSpace(s.query)
@@ -85,7 +86,9 @@ func (s *app) browse(kind, source, id string) {
 			} else {
 				all.Tracks = append(all.Tracks, r.data.Tracks...)
 				all.Collections = append(all.Collections, r.data.Collections...)
-				all.Categories = append(all.Categories, r.data.Categories...)
+				if r.data.Container != nil {
+					all.Container = r.data.Container
+				}
 			}
 		}
 		s.update(func() {
@@ -95,11 +98,17 @@ func (s *app) browse(kind, source, id string) {
 			s.searching = false
 			s.results = all.Tracks
 			s.collections = all.Collections
-			s.categories = all.Categories
 			s.checked = map[string]bool{}
 			s.list = ui.ListState{}
 			s.status = strings.Join(errs, "；")
-			if len(all.Tracks)+len(all.Collections)+len(all.Categories) == 0 && s.status == "" {
+			if all.Container != nil {
+				s.currentCollection = all.Container
+				s.collectionTitle = all.Container.Name
+				s.collectionKind = all.Container.Kind
+				s.collectionID = all.Container.ID
+				s.searchKind = all.Container.Kind
+			}
+			if len(all.Tracks)+len(all.Collections) == 0 && s.status == "" {
 				s.status = "没有找到结果"
 			}
 			s.redraw()
@@ -109,6 +118,7 @@ func (s *app) browse(kind, source, id string) {
 func (s *app) openCollection(c library.Collection) {
 	s.browse(c.Kind, c.Source, c.ID)
 	s.collectionTitle = c.Name
+	s.currentCollection = &c
 }
 func (s *app) localMusic() {
 	s.query = ""
@@ -167,6 +177,7 @@ func (s *app) shownTracks() []library.Track {
 	return tracks
 }
 func (s *app) recordHistory(t library.Track) {
+	t.PlayedAt = time.Now().Unix()
 	history := []library.Track{t}
 	for _, old := range s.cfg.History {
 		if old.Key() != t.Key() {
@@ -196,34 +207,26 @@ func (s *app) selectedTracks() []library.Track {
 	}
 	return out
 }
-func (s *app) savePlaylist(name string, tracks []library.Track) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		s.status = "请输入歌单名称"
-		return
-	}
-	s.cfg.Playlists = append(s.cfg.Playlists, library.Playlist{ID: fmt.Sprint(time.Now().UnixNano()), Name: name, Tracks: append([]library.Track(nil), tracks...)})
-	s.playlistName = ""
-	s.pendingTracks = nil
-	s.save()
-}
 func (s *app) addToPlaylist(id string, tracks []library.Track) {
-	for i := range s.cfg.Playlists {
-		p := &s.cfg.Playlists[i]
+	for _, p := range s.cfg.Playlists {
 		if p.ID != id {
 			continue
 		}
+		p.Tracks = append([]library.Track(nil), p.Tracks...)
 		for _, t := range tracks {
 			if !slices.ContainsFunc(p.Tracks, func(v library.Track) bool { return v.Key() == t.Key() }) {
 				p.Tracks = append(p.Tracks, t)
 			}
 		}
-		s.save()
-		break
+		if !s.storePlaylist(p) {
+			return
+		}
+		s.pendingTracks = nil
+		s.modal = ""
+		s.status = "已加入歌单"
+		return
 	}
-	s.pendingTracks = nil
-	s.modal = ""
-	s.status = "已加入歌单"
+	s.playlistError = "歌单不存在，请重新选择"
 }
 func (s *app) startLogin(source string) {
 	if s.loginCancel != nil {
@@ -337,6 +340,10 @@ func (s *app) artwork(t library.Track) *ui.Bitmap {
 	if img, ok := s.images[key]; ok {
 		return img
 	}
+	// Headless renders use supplied fixtures and never start network requests.
+	if s.win == nil {
+		return nil
+	}
 	if s.imagePending[key] {
 		return nil
 	}
@@ -431,7 +438,10 @@ func (s *app) importPlaylists() {
 						tracks = append(tracks, t)
 					}
 				}
-				s.savePlaylist(p.Name, tracks)
+				p.Tracks = tracks
+				if !s.storePlaylist(p) {
+					return
+				}
 			}
 			s.status = "歌单已导入"
 		})
@@ -539,4 +549,13 @@ func (s *app) pickLocalFiles() {
 			s.localMusic()
 		})
 	}()
+}
+
+func (s *app) cancelBrowse() {
+	if s.searchCancel != nil {
+		s.searchCancel()
+		s.searchCancel = nil
+	}
+	s.searchID++
+	s.searching = false
 }

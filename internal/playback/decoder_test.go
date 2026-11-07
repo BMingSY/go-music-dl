@@ -2,6 +2,7 @@ package playback
 
 import (
 	"context"
+	_ "embed"
 	"io"
 	"math"
 	"net/http"
@@ -30,9 +31,18 @@ func testFFmpeg(t *testing.T) string {
 	return p
 }
 
+//go:embed testdata/sine.mp3
+var mp3Fixture []byte
+
 func fixture(t *testing.T, ffmpeg, ext string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "音频 fixture."+ext)
+	if ext == "mp3" {
+		if err := os.WriteFile(path, mp3Fixture, 0600); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, ffmpeg, "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=4", "-y", path)

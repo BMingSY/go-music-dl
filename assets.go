@@ -9,43 +9,22 @@ import (
 //go:embed assets/*.ttf assets/*.png
 var assets embed.FS
 var assetsOnce sync.Once
-var mascot *ui.Bitmap
-var alternateMascot *ui.Bitmap
 var icons = map[string]string{
 	"music": "\uf001", "search": "\uf002", "fire": "\uf06d", "folder": "\uf07c", "grid": "\uf009", "rank": "\uf091", "heart": "\uf004", "gear": "\uf013", "download": "\uf019", "history": "\uf1da", "clock": "\uf017", "up": "\uf062", "down": "\uf063", "headphones": "\uf025", "play": "\uf04b", "pause": "\uf04c", "prev": "\uf048", "next": "\uf051", "repeat": "\uf01e", "shuffle": "\uf074", "list": "\uf03a", "close": "\uf00d", "volume": "\uf028", "file": "\uf15c", "image": "\uf03e", "back": "\uf060", "mini": "\uf2d0", "user": "\uf007", "chevron": "\uf107", "sliders": "\uf1de", "plus": "\uf067", "trash": "\uf2ed", "link": "\uf0c1", "video": "\uf008",
 	"font": "\uf031", "keyboard": "\uf11c", "info": "\uf05a", "cookie": "\uf564", "more": "\uf141", "stop": "\uf04d", "cloud": "\uf0ed", "switch": "\uf021", "ranking": "\ue561",
-	"caret-up": "\uf106", "user-circle": "\uf2bd", "circle-close": "\uf057", "target": "\uf140",
+	"disc": "\uf51f", "clapper": "\ue131", "spinner": "\uf110", "edit": "\uf303", "caret-up": "\uf106", "user-circle": "\uf2bd", "circle-close": "\uf057", "target": "\uf140",
 }
 
 func initAssets() {
 	assetsOnce.Do(func() {
-		for _, f := range []struct{ file, name string }{{"fa-solid-900.ttf", "MusicDL Icons"}, {"fa-regular-400.ttf", "MusicDL Outline"}} {
+		for _, f := range []struct{ file, name string }{{"musicdl-icons.ttf", "MusicDL Icons"}, {"musicdl-outline.ttf", "MusicDL Outline"}} {
 			b, _ := assets.ReadFile("assets/" + f.file)
 			_ = ui.RegisterFont(b, f.name)
 		}
-		b, _ := assets.ReadFile("assets/mascot-0.png")
-		mascot, _ = ui.DecodeBitmap(b)
-		b, _ = assets.ReadFile("assets/mascot-1.png")
-		alternateMascot, _ = ui.DecodeBitmap(b)
+
 	})
 }
 
-func (s *app) mascotView(c *ui.Context) {
-	ui.Column(c).Absolute().Right(14).Bottom(90).Width(150).AlignItems(ui.Center).Children(func() {
-		character := mascot
-		if s.mascotAlternate {
-			character = alternateMascot
-		}
-		ui.Image(c, character).Size(150, 150).Fit(ui.Contain).OnClick(func() { s.mascotAlternate = !s.mascotAlternate })
-		ui.Box(c).Size(6, 13).Background(ui.Hex("#aaaaaa"))
-		ui.Row(c).Gap(4).Padding(3, 5).Background(ui.Hex("#dddddd")).Radius(5).Shadow(0, 4, 12, 0, ui.RGBA(0, 0, 0, .1)).Children(func() {
-			iconButton(c, "character", "user-circle", "切换挂件", 18).Background(ui.Transparent).OnClick(func() { s.mascotAlternate = !s.mascotAlternate })
-			iconButton(c, "reset", "target", "重置挂件", 18).Background(ui.Transparent).OnClick(func() { s.mascotAlternate = false })
-			iconButton(c, "source", "link", "Sakana Widget", 18).Background(ui.Transparent).OnClick(func() { c.OpenURL("https://github.com/dsrkafuu/sakana-widget") })
-			iconButton(c, "hide", "circle-close", "隐藏挂件", 18).Background(ui.Transparent).OnClick(func() { s.cfg.ShowMascot = false; s.save() })
-		})
-	})
-}
 func glyph(c *ui.Context, name string, size float32, color ui.Color) ui.Element {
 	return ui.Text(c, icons[name]).Font("MusicDL Icons").FontSize(size).TextColor(color).SingleLine()
 }
@@ -53,15 +32,31 @@ func iconButton(c *ui.Context, key, icon, label string, size float32) ui.Element
 	return colorIconButton(c, key, icon, label, size, muted, false)
 }
 func colorIconButton(c *ui.Context, key, icon, label string, size float32, color ui.Color, outline bool) ui.Element {
-	return ui.Button(c.Key(key), "").Label(label).Tooltip(label).Size(size, size).Padding(0).Radius(size/2).Background(white).Border(0, ui.Transparent).Children(func() {
-		i := glyph(c, icon, 14, color)
+	button := ui.Button(c.Key(key), "").Label(label).Tooltip(label).Size(size, size).Padding(0).Radius(size/2).Background(white).Border(0, ui.Transparent)
+	button.Transition(ui.ElementTransition{Colors: true})
+	if icon == "play" || icon == "stop" {
+		buttonMotion(button, 1.1, 0)
+	}
+	button.Children(func() {
+		glyphSize := float32(14)
+		if size >= 50 {
+			glyphSize = 20
+		} else if size == 40 {
+			glyphSize = 18
+		} else if size == 28 {
+			glyphSize = 16
+		}
+		i := glyph(c, icon, glyphSize, color)
 		if outline {
 			i.Font("MusicDL Outline")
 		}
 	})
+	return button
 }
 func pill(c *ui.Context, icon, label, from, to string, fn func()) {
-	ui.Button(c.Key(label), "").Label(label).Radius(20).Padding(8, 18).Height(37).Border(0, ui.Transparent).Gradient(ui.Hex(from), ui.Hex(to), 135).Shadow(0, 4, 15, 0, ui.Hex(from).Alpha(.35)).OnClick(fn).Children(func() {
+	button := ui.Button(c.Key(label), "").Label(label).Radius(20).Padding(8, 18).Height(37).Border(0, ui.Transparent).Gradient(ui.Hex(from), ui.Hex(to), 135).Shadow(0, 4, 15, 0, ui.Hex(from).Alpha(.35)).OnClick(fn)
+	buttonMotion(button, 1, 2)
+	button.Children(func() {
 		ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() { glyph(c, icon, 14, white); ui.Text(c, label).FontSize(14).FontWeight(600).TextColor(white) })
 	})
 }

@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/BMingSY/go-music-dl/internal/library"
+	"github.com/BMingSY/go-music-dl/internal/lyrics"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/audio"
 	"github.com/guohuiyuan/music-lib/model"
@@ -61,6 +63,32 @@ func runSmoke(s *app, dir, file string) error {
 		if err := waitSmoke(s, func() bool { return s.player.Playing() && s.player.Position() > 3300*time.Millisecond }); err != nil {
 			return err
 		}
+		if _, e := os.Stat(strings.TrimSuffix(file, filepath.Ext(file)) + ".lrc"); e == nil {
+			if err := waitSmoke(s, func() bool { return len(s.lines) > 0 }); err != nil {
+				return fmt.Errorf("local timed lyrics: %w", err)
+			}
+			mygo.RunOnMain(func() {
+				s.position = s.player.Position()
+				i := lyrics.Index(s.lines, s.position)
+				text, _ := s.miniCaption()
+				if i < 0 || text != s.lines[i].Text {
+					err = fmt.Errorf("mini lyric did not follow playback after seek")
+				}
+				s.lyricOpen = true
+			})
+			if err != nil {
+				return err
+			}
+			time.Sleep(600 * time.Millisecond)
+			b, e := s.win.CapturePage()
+			if e != nil {
+				return e
+			}
+			if e = os.WriteFile(filepath.Join(dir, "lyrics.png"), b, 0600); e != nil {
+				return e
+			}
+			mygo.RunOnMain(func() { s.lyricOpen = false })
+		}
 	}
 	mygo.RunOnMain(func() {
 		s.win.Close()
@@ -87,6 +115,36 @@ func runSmoke(s *app, dir, file string) error {
 			return err
 		}
 	}
+	if file != "" {
+		var savedPosition time.Duration
+		mygo.RunOnMain(func() {
+			s.position = s.player.Position()
+			savedPosition = s.position
+			if e := s.savePlayback(); e != nil {
+				err = e
+				return
+			}
+			s.stop()
+			s.current = nil
+			s.queue = nil
+			s.queueIndex = -1
+			s.position = 0
+			s.restorePlayback()
+			if s.current == nil || s.player != nil || s.playing || absDuration(s.position-savedPosition) > time.Millisecond {
+				err = fmt.Errorf("saved playback did not restore paused at its previous position")
+				return
+			}
+			s.toggle()
+		})
+		if err != nil {
+			return err
+		}
+		if e := waitSmoke(s, func() bool {
+			return s.player != nil && s.player.Playing() && s.player.Position() > savedPosition+200*time.Millisecond
+		}); e != nil {
+			return fmt.Errorf("resume saved playback: %w", e)
+		}
+	}
 	mygo.RunOnMain(func() { s.win.Show() })
 	time.Sleep(300 * time.Millisecond)
 	for name, w := range map[string]*mygo.Window{"main": s.win, "mini": s.mini} {
@@ -99,6 +157,13 @@ func runSmoke(s *app, dir, file string) error {
 		}
 	}
 	return nil
+}
+
+func absDuration(d time.Duration) time.Duration {
+	if d < 0 {
+		return -d
+	}
+	return d
 }
 
 func waitSmoke(s *app, ready func() bool) error {

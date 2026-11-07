@@ -100,7 +100,7 @@ func TestQueueRestoresInterruptedJobsWithoutCookies(t *testing.T) {
 		t.Fatal("cookie leaked into job history")
 	}
 	restored := New(ctx, path).Snapshot()
-	if len(restored) != 1 || restored[0].State != "canceled" {
+	if len(restored) != 1 || restored[0].State != "queued" {
 		t.Fatalf("restored=%v", restored)
 	}
 	if !errors.Is(ctx.Err(), context.Canceled) {

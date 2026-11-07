@@ -55,7 +55,7 @@ func (s *app) playerView(c *ui.Context) {
 				})
 				ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
 					pos := s.position.Seconds()
-					if slimSlider(c, "播放进度", &pos, max(1, s.duration.Seconds())).Grow(1).Disabled(s.player == nil).Changed() {
+					if slimSlider(c, "播放进度", &pos, max(1, s.duration.Seconds())).Grow(1).Disabled(s.current == nil).Changed() {
 						s.seek(time.Duration(pos * float64(time.Second)))
 					}
 					ui.Text(c, clockText(s.position)+" / "+clockText(s.duration)).FontSize(11).TextColor(ui.Hex("#999999"))
@@ -72,21 +72,15 @@ func (s *app) playerView(c *ui.Context) {
 							s.volume(v)
 						}
 					})
-					playerIcon(c, "mode", "repeat", "循环播放").OnClick(s.cycleMode)
-					playerIcon(c, "queue", "list", "播放队列").OnClick(func() { s.queueOpen = !s.queueOpen })
+					s.modeButton(c, "mode", "播放模式：", 16, ui.Hex("#666666"))
+					playerIcon(c, "queue", "list", "播放队列").OnClick(s.toggleQueue)
 				})
 			})
 			ui.Button(c, "‹").Width(18).Height(66).Radius(0).Padding(0).Background(ui.Hex("#e6e6e6")).Border(0, ui.Transparent).Label("收起播放器").OnClick(func() { s.playerExpanded = false })
 		})
 		if s.current != nil {
 			ui.Row(c).Absolute().Bottom(72).Left(17).Width(371).Gap(6).Children(func() {
-				mode := "list"
-				if s.cfg.PlayMode == "shuffle" {
-					mode = "shuffle"
-				} else if s.cfg.PlayMode == "one" {
-					mode = "repeat"
-				}
-				colorIconButton(c, "playmode", mode, "切换播放模式", 32, white, false).Height(28).Radius(6).Background(accent).Border(1, ui.Hex("#059669")).OnClick(s.cycleMode)
+				s.modeButton(c, "playmode", "切换播放模式：", 32, white).Height(28).Radius(6).Background(accent).Border(1, ui.Hex("#059669"))
 				colorIconButton(c, "favorite", "heart", "收藏当前歌曲", 32, ui.Hex("#047857"), true).Height(28).Radius(6).Border(1, ui.Hex("#cce7da")).OnClick(func() { s.pendingTracks = []library.Track{*s.current}; s.modal = "collections" })
 				colorIconButton(c, "download", "download", "下载当前歌曲", 32, ui.Hex("#047857"), false).Height(28).Radius(6).Border(1, ui.Hex("#cce7da")).OnClick(func() { s.addDownloads([]library.Track{*s.current}) })
 				ui.Spacer(c)
@@ -132,20 +126,30 @@ func slimSlider(c *ui.Context, label string, value *float64, hi float64) ui.Elem
 	})
 }
 
+const queueRowHeight = 33
+const queueVisibleRows = 7
+
 func (s *app) queueView(c *ui.Context) {
+	if s.queueReveal {
+		index := max(0, s.currentQueueIndex())
+		s.queueScroll.Y = float32(max(0, min(index-queueVisibleRows/2, len(s.queue)-queueVisibleRows)) * queueRowHeight)
+		s.queueReveal = false
+	}
 	ui.Column(c).Width(400).Background(white).Border(1, ui.Hex("#eeeeee")).Margin(0, 0, 34, 0).Children(func() {
 		ui.Row(c).Padding(8, 12).Gap(8).Background(ui.Hex("#f8fafc")).AlignItems(ui.Center).Children(func() {
 			ui.Text(c, fmt.Sprintf("播放队列 · %d 首", len(s.queue))).FontSize(12).TextColor(muted).Grow(1)
+			iconButton(c, "locate-current", "target", "定位当前歌曲", 28).Radius(6).Background(white).Border(1, border).Disabled(s.currentQueueIndex() < 0).OnClick(func() { s.queueReveal = true })
 			ui.Button(c, "清空队列").FontSize(11).OnClick(func() { s.queue = nil; s.queueIndex = -1; s.queueOpen = false })
 		})
-		ui.Scroll(c).Height(min(220, float32(len(s.queue)*33))).Children(func() {
+		ui.Scroll(c.Key("player-queue-scroll")).Label("播放队列列表").Height(float32(min(queueVisibleRows, len(s.queue)) * queueRowHeight)).TrackScroll(&s.queueScroll).Children(func() {
 			ui.Column(c).Children(func() {
 				for index, track := range s.queue {
 					bg := white
 					if s.current != nil && s.current.Key() == track.Key() {
 						bg = ui.Hex("#e9e9e9")
 					}
-					ui.Row(c.Key(track.Key())).Height(33).Gap(8).Padding(0, 8, 0, 12).Background(bg).AlignItems(ui.Center).OnClick(func() { s.play(index, s.queue) }).Children(func() {
+					row := ui.Row(c.Key(track.Key())).Label("队列歌曲 "+track.Name).Height(queueRowHeight).Gap(8).Padding(0, 8, 0, 12).Background(bg).AlignItems(ui.Center).OnClick(func() { s.play(index, s.queue) })
+					row.Children(func() {
 						ui.Text(c, fmt.Sprint(index+1)).FontSize(12).TextColor(muted)
 						ui.Text(c, track.Name).FontSize(12).Grow(1).SingleLine().Ellipsis("…")
 						ui.Text(c, track.Artist).FontSize(12).TextColor(muted).MaxWidth(125).SingleLine().Ellipsis("…")

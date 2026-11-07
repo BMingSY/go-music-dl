@@ -11,9 +11,15 @@ import (
 )
 
 type Playlist struct {
-	ID     string  `json:"id"`
-	Name   string  `json:"name"`
-	Tracks []Track `json:"tracks"`
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Tracks      []Track `json:"tracks"`
+	Description string  `json:"description,omitempty"`
+	Cover       string  `json:"cover,omitempty"`
+	Source      string  `json:"source,omitempty"`
+	ExternalID  string  `json:"external_id,omitempty"`
+	Kind        string  `json:"kind,omitempty"`
+	Link        string  `json:"link,omitempty"`
 }
 type Collection struct {
 	model.Playlist
@@ -22,7 +28,7 @@ type Collection struct {
 type Catalog struct {
 	Tracks      []Track
 	Collections []Collection
-	Categories  []model.PlaylistCategory
+	Container   *Collection
 }
 type collectionProvider interface {
 	SearchPlaylist(string) ([]model.Playlist, error)
@@ -38,9 +44,7 @@ func Browse(ctx context.Context, source, kind, query, id string, page int, cfg C
 		return result, err
 	}
 	if kind == "song" {
-		tracks, err := Search(ctx, source, query, cfg)
-		result.Tracks = tracks
-		return result, err
+		return searchCatalog(ctx, source, query, cfg)
 	}
 	p, err := provider(source, cfg)
 	if err != nil {
@@ -54,7 +58,11 @@ func Browse(ctx context.Context, source, kind, query, id string, page int, cfg C
 		if id != "" {
 			songs, err = cp.GetPlaylistSongs(id)
 		} else if isURL(query) {
-			_, songs, err = cp.ParsePlaylist(query)
+			var meta *model.Playlist
+			meta, songs, err = cp.ParsePlaylist(query)
+			if meta != nil {
+				result.Container = &Collection{Playlist: *meta, Kind: "playlist"}
+			}
 		} else {
 			lists, err = cp.SearchPlaylist(query)
 		}
@@ -66,11 +74,15 @@ func Browse(ctx context.Context, source, kind, query, id string, page int, cfg C
 		if id != "" {
 			songs, err = n.GetAlbumSongs(id)
 		} else if isURL(query) {
-			_, songs, err = n.ParseAlbum(query)
+			var meta *model.Playlist
+			meta, songs, err = n.ParseAlbum(query)
+			if meta != nil {
+				result.Container = &Collection{Playlist: *meta, Kind: "album"}
+			}
 		} else {
 			lists, err = n.SearchAlbum(query)
 		}
-	case "recommend", "mine", "categories", "category", "ranks", "rank":
+	case "recommend", "mine", "ranks", "rank":
 		n, ok := p.(*netease.Netease)
 		if !ok {
 			return result, errors.New("此功能支持网易云音乐")
@@ -80,15 +92,11 @@ func Browse(ctx context.Context, source, kind, query, id string, page int, cfg C
 			lists, err = n.GetRecommendedPlaylists()
 		case "mine":
 			lists, err = n.GetUserPlaylists(max(page, 1), 30)
-		case "categories":
-			result.Categories, err = n.GetPlaylistCategories()
-		case "category":
-			lists, err = n.GetCategoryPlaylists(id, max(page, 1), 30)
 		case "ranks":
 			var ranks []model.TopList
 			ranks, err = n.GetTopLists()
 			for _, r := range ranks {
-				result.Collections = append(result.Collections, Collection{Playlist: model.Playlist{ID: r.ID, Name: r.Name, Cover: r.Cover, Description: r.Description, Source: source, TrackCount: r.TrackCount}, Kind: "rank"})
+				result.Collections = append(result.Collections, Collection{Playlist: model.Playlist{ID: r.ID, Name: r.Name, Cover: r.Cover, Description: r.Description, Source: source, TrackCount: r.TrackCount, PlayCount: int(r.PlayCount), Link: r.Link, Extra: map[string]string{"update_frequency": r.UpdateFrequency}}, Kind: "rank"})
 			}
 		case "rank":
 			songs, err = n.GetTopListSongs(id)

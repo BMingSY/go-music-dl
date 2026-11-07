@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"slices"
 
 	"github.com/BMingSY/go-music-dl/internal/library"
@@ -10,8 +9,22 @@ import (
 )
 
 func (s *app) modalView(c *ui.Context, w, h float32) {
+	if s.modal == "history" || s.modal == "downloads" {
+		s.utilityModal(c, w, h)
+		return
+	}
 	titles := map[string]string{"settings": "系统设置", "collections": "本地歌单", "login": "扫码登录", "downloads": "下载管理", "about": "关于 music-dl"}
+	titles["collections"] = "收藏到我的歌单"
+	titles["edit-playlist"] = "新建歌单"
+	if s.editPlaylistID != "" {
+		titles["edit-playlist"] = "编辑歌单"
+	}
+	titles["import-playlist"] = "导入歌单"
 	width, height := float32(640), min(h-40, 600)
+	if s.modal == "about" {
+		width = 420
+		height = min(h-40, 360)
+	}
 	if s.modal == "settings" {
 		width = 760
 		height = min(h-40, 720)
@@ -20,9 +33,21 @@ func (s *app) modalView(c *ui.Context, w, h float32) {
 		width = 420
 		height = 430
 	}
-	back := ui.Box(c.Key("modal-backdrop")).Absolute().Fill().Background(ui.RGBA(0, 0, 0, .5)).Center().Modal()
+	if s.modal == "edit-playlist" || s.modal == "collections" {
+		s.playlistEditorModal(c, w, h)
+		return
+	}
+	if s.modal == "collections" {
+		width = 400
+		height = min(h-40, 520)
+	}
+	if s.modal == "import-playlist" {
+		width = 440
+		height = min(h-40, 280)
+	}
+	back := ui.Box(c.Key("modal-backdrop")).Absolute().Fill().Background(ui.RGBA(0, 0, 0, .5)).Center().Modal().Transition(ui.ElementTransition{Enter: &ui.Motion{}, Exit: &ui.Motion{}})
 	back.Children(func() {
-		ui.Column(c).Size(min(w-40, width), height).Background(white).Radius(18).Border(1, ui.Hex("#dcebe4")).Shadow(0, 20, 40, 0, ui.RGBA(0, 0, 0, .2)).Clip().Children(func() {
+		ui.Column(c).Size(min(w-40, width), height).Background(white).Radius(18).Border(1, ui.Hex("#dcebe4")).Shadow(0, 20, 40, 0, ui.RGBA(0, 0, 0, .2)).Clip().Transition(panelTransition).Children(func() {
 			ui.Row(c).Padding(20, 22, 16, 22).BorderWidth(0, 0, 1, 0).BorderColor(ui.Hex("#edf2f7")).AlignItems(ui.Center).Children(func() {
 				ui.Column(c).Grow(1).Gap(4).Children(func() {
 					ui.Text(c, titles[s.modal]).FontSize(18).Bold()
@@ -44,6 +69,10 @@ func (s *app) modalView(c *ui.Context, w, h float32) {
 					s.downloadsView(c)
 				case "about":
 					s.aboutView(c)
+				case "edit-playlist":
+					s.editPlaylistView(c)
+				case "import-playlist":
+					s.importLinkView(c)
 				}
 			})
 		})
@@ -132,59 +161,50 @@ func (s *app) settingsView(c *ui.Context) {
 	ui.PrimaryButton(c, "保存设置").FillWidth().Height(40).FontSize(14).FontWeight(600).OnClick(func() { s.save(); s.closeModal() })
 }
 func (s *app) savedPlaylistsView(c *ui.Context) {
-	ui.Row(c).Gap(8).Children(func() {
-		ui.TextInput(c, &s.playlistName).Label("歌单名称").Placeholder("新歌单名称").Grow(1)
-		ui.PrimaryButton(c, "新建歌单").OnClick(func() { s.savePlaylist(s.playlistName, s.pendingTracks) })
+	ui.Row(c).AlignItems(ui.Center).Margin(0, 0, 15, 0).Children(func() {
+		ui.Text(c, "选择或管理歌单").FontSize(14).TextColor(muted).Grow(1)
+		ui.Button(c, "+ 新建").Label("新建歌单").TextColor(white).Background(accent).Border(0, ui.Transparent).Radius(20).Padding(6, 12).FontSize(12).OnClick(func() { s.editPlaylist(nil) })
 	})
 	ui.Scroll(c).Grow(1).Children(func() {
 		ui.Column(c).Gap(10).Children(func() {
-			ui.Row(c).Padding(12).Background(ui.Hex("#fff5f5")).Radius(10).Gap(10).Children(func() {
-				glyph(c, "heart", 16, ui.Hex("#f68084"))
-				ui.Text(c, "我的收藏").Grow(1)
-				ui.Button(c, "打开").Label("打开我的收藏").OnClick(func() {
-					s.page = "favorites"
-					s.collections = nil
-					s.categories = nil
-					s.pageNumber = 1
-					s.closeModal()
-				})
-				if len(s.pendingTracks) > 0 {
-					ui.Button(c, "加入收藏").OnClick(func() {
-						for _, t := range s.pendingTracks {
-							if !s.isFavorite(t) {
-								s.favorite(t)
-							}
-						}
-						s.closeModal()
-					})
+			lists := append([]library.Playlist{{ID: "favorites", Name: "我的收藏", Tracks: s.cfg.Favorites}}, s.cfg.Playlists...)
+			for _, p := range lists {
+				row := ui.Row(c.Key(p.ID)).Padding(10).Border(1, border).Radius(12).Background(ui.Hex("#faf8f8")).AlignItems(ui.Center)
+				if row.Hovered() {
+					row.Border(1, accent).Background(ui.Hex("#f0fff4"))
 				}
-			})
-			for _, p := range s.cfg.Playlists {
-				ui.Row(c.Key(p.ID)).Padding(12).Border(1, border).Radius(10).Gap(8).Children(func() {
-					ui.Column(c).Grow(1).Gap(4).Children(func() {
-						ui.Text(c, p.Name).Bold()
-						ui.Text(c, fmt.Sprintf("%d 首歌曲", len(p.Tracks))).FontSize(12).TextColor(muted)
-					})
-					if len(s.pendingTracks) > 0 {
-						ui.Button(c, "加入").OnClick(func() { s.addToPlaylist(p.ID, s.pendingTracks) })
+				row.Children(func() {
+					label := "加入"
+					if p.ID == "favorites" {
+						label = "加入收藏"
 					}
-					ui.Button(c, "打开").OnClick(func() {
-						s.page = "collection"
-						s.localPlaylistID = p.ID
-						s.collectionTitle = p.Name
-						s.collections = nil
-						s.categories = nil
-						s.pageNumber = 1
-						s.closeModal()
+					ui.Row(c).Grow(1).Gap(12).AlignItems(ui.Center).Label(label).OnClick(func() {
+						if len(s.pendingTracks) == 0 {
+							s.openLocalPlaylist(p)
+							s.modal = ""
+							return
+						}
+						if p.ID == "favorites" {
+							for _, t := range s.pendingTracks {
+								if !s.isFavorite(t) {
+									s.favorite(t)
+								}
+							}
+							s.closeModal()
+							return
+						}
+						s.addToPlaylist(p.ID, s.pendingTracks)
+					}).Children(func() {
+						ui.Box(c).Size(40, 40).Radius(6).Clip().Children(func() { s.playlistCoverView(c, p.Name, p.Cover, p.ID, 40) })
+						ui.Text(c, p.Name).FontSize(14).SingleLine().Ellipsis("…").Grow(1)
 					})
-					iconButton(c, "delete", "trash", "删除歌单 "+p.Name, 28).OnClick(func() { s.confirmDeletePlaylist(p.ID, p.Name) })
+					if p.ID != "favorites" {
+						iconButton(c, "edit", "edit", "编辑歌单 "+p.Name, 28).Radius(6).Border(1, border).Margin(0, 0, 0, 10).OnClick(func() { s.editPlaylist(&p) })
+						iconButton(c, "delete", "trash", "删除歌单 "+p.Name, 28).Radius(6).Border(1, border).Margin(0, 0, 0, 6).OnClick(func() { s.confirmDeletePlaylist(p.ID, p.Name) })
+					}
 				})
 			}
 		})
-	})
-	ui.Row(c).Gap(8).Children(func() {
-		ui.Button(c, "导入歌单").OnClick(s.importPlaylists)
-		ui.Button(c, "导出歌单").OnClick(s.exportPlaylists)
 	})
 }
 func (s *app) confirmDeletePlaylist(id, name string) {
@@ -207,57 +227,53 @@ func (s *app) loginView(c *ui.Context) {
 		ui.Button(c, "重新获取二维码").OnClick(func() { s.startLogin(s.loginSource) })
 	})
 }
-func (s *app) downloadsView(c *ui.Context) {
-	labels := map[string]string{"queued": "等待下载", "downloading": "正在下载", "done": "下载完成", "failed": "下载失败", "canceled": "已取消"}
-	ui.Row(c).Gap(8).Children(func() {
-		ui.Button(c, "打开下载目录").OnClick(s.openDownloadDir)
-		ui.Button(c, "清理已结束记录").OnClick(func() {
-			if s.downloads != nil {
-				s.downloads.Clear()
-				s.jobs = s.downloads.Snapshot()
-			}
-		})
-	})
-	ui.Scroll(c).Grow(1).Children(func() {
-		ui.Column(c).Gap(10).Children(func() {
-			for _, j := range s.jobs {
-				ui.Column(c.Key(j.Track.Key())).Padding(12).Border(1, border).Radius(10).Gap(8).Children(func() {
-					ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
-						ui.Column(c).Grow(1).Gap(4).Children(func() {
-							ui.Text(c, j.Track.Name).FontSize(14).Bold().SingleLine().Ellipsis("…")
-							ui.Text(c, labels[j.State]+"  "+j.Error).FontSize(12).TextColor(muted).MaxLines(2)
-						})
-						if j.State == "queued" || j.State == "downloading" {
-							ui.Button(c, "取消").OnClick(func() { s.downloads.Cancel(j.Track.Key()) })
-						} else if j.State == "failed" || j.State == "canceled" {
-							ui.Button(c, "重试").OnClick(func() { s.addDownloads([]library.Track{j.Track}) })
-						} else if j.State == "done" {
-							ui.Button(c, "打开").OnClick(func() { mygo.Shell.ShowItemInFolder(j.Path) })
-						}
-					})
-					if j.State == "downloading" {
-						progress := float64(0)
-						if j.Total > 0 {
-							progress = float64(j.Done) / float64(j.Total)
-						}
-						ui.Box(c).Height(4).Background(border).Radius(2).Children(func() { ui.Box(c).WidthPercent(float32(progress * 100)).Height(4).Background(accent).Radius(2) })
-						ui.Text(c, fmt.Sprintf("%.1f / %.1f MB", float64(j.Done)/(1<<20), float64(max(0, j.Total))/(1<<20))).FontSize(11).TextColor(muted)
-					}
-				})
-			}
-			if len(s.jobs) == 0 {
-				ui.Text(c, "暂无下载记录").TextColor(muted).Padding(30)
-			}
-		})
-	})
-}
 func (s *app) aboutView(c *ui.Context) {
 	ui.Text(c, "music-dl").FontSize(28).Bold().TextColor(accent)
 	ui.Text(c, "版本 "+mygo.App.Version()).FontSize(14).TextColor(muted)
 	ui.Text(c, "网易云音乐 · Bilibili · 本地音乐").FontSize(14)
+	ui.Column(c).Gap(7).Children(func() {
+		for _, link := range []struct{ label, name, url string }{{"项目地址", "BMingSY/go-music-dl", "https://github.com/BMingSY/go-music-dl"}, {"改自", "guohuiyuan/go-music-dl", "https://github.com/guohuiyuan/go-music-dl"}} {
+			ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+				ui.Text(c, link.label).Width(56).FontSize(13).TextColor(muted)
+				ui.Link(c, link.name, link.url).FontSize(13).TextColor(accent).Underline()
+			})
+		}
+	})
 	ui.Button(c, "检查更新").Disabled(s.updateBusy).OnClick(s.checkUpdate)
-	ui.Text(c, s.status).FontSize(13).TextColor(muted).MaxLines(5)
+	ui.Text(c, s.updateStatus).FontSize(13).TextColor(muted).MaxLines(5)
 	if s.updateBusy {
 		ui.Box(c).Height(5).Background(border).Radius(3).Children(func() { ui.Box(c).WidthPercent(float32(s.updateProgress * 100)).Height(5).Background(accent).Radius(3) })
+	}
+}
+
+func (s *app) playlistEditorModal(c *ui.Context, w, h float32) {
+	height := float32(372)
+	title := "新建歌单"
+	if s.editPlaylistID != "" {
+		title = "编辑歌单"
+	}
+	if s.modal == "collections" {
+		height = min(h*.85, 136+float32(len(s.cfg.Playlists)+1)*72)
+		title = "收藏到我的歌单"
+	}
+	if s.playlistError != "" {
+		height += 36
+	}
+	back := ui.Box(c.Key("modal-backdrop")).Absolute().Fill().Background(ui.RGBA(0, 0, 0, .5)).Center().Modal()
+	back.Children(func() {
+		ui.Column(c).Width(min(w-40, 450)).Height(min(h*.85, height)).Padding(25).Radius(20).Background(white).Shadow(0, 20, 40, 0, ui.RGBA(0, 0, 0, .2)).Transition(panelTransition).Children(func() {
+			ui.Row(c).Height(27).Margin(0, 0, 15, 0).AlignItems(ui.Center).Children(func() {
+				ui.Text(c, title).FontSize(18).Bold().Grow(1)
+				iconButton(c, "close-editor", "close", "关闭弹窗", 20).Background(ui.Transparent).OnClick(s.closeModal)
+			})
+			if s.modal == "collections" {
+				s.savedPlaylistsView(c)
+			} else {
+				ui.Scroll(c).Grow(1).Children(func() { ui.Column(c).Children(func() { s.editPlaylistView(c) }) })
+			}
+		})
+	})
+	if back.OverlayShortcut(0, ui.KeyEscape) {
+		s.closeModal()
 	}
 }

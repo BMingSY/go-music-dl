@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"image/png"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/BMingSY/go-music-dl/internal/download"
 	"github.com/BMingSY/go-music-dl/internal/library"
 	"github.com/BMingSY/go-music-dl/internal/lyrics"
 	"github.com/egoist/mygo/ui"
@@ -149,31 +152,118 @@ func TestRenderPreview(t *testing.T) {
 	}
 	s := newApp(context.Background(), library.Config{Volume: .7}, "")
 	s.results = []library.Track{{Song: model.Song{ID: "1", Source: "netease", Name: "夜に駆ける", Artist: "YOASOBI", Duration: 258}}, {Song: model.Song{ID: "2", Source: "netease", Name: "无声的星空", Artist: "本地音乐", Duration: 216}}, {Song: model.Song{ID: "3", Source: "bilibili", Name: "钢琴与雨", Artist: "Bilibili", Duration: 185}}}
+	if fixture := os.Getenv("MUSIC_DL_REVIEW_FIXTURE"); fixture != "" {
+		var track library.Track
+		b, e := os.ReadFile(filepath.Join(fixture, "track.json"))
+		if e != nil {
+			t.Fatal(e)
+		}
+		if e = json.Unmarshal(b, &track); e != nil {
+			t.Fatal(e)
+		}
+		b, e = os.ReadFile(filepath.Join(fixture, "cover.jpg"))
+		if e != nil {
+			t.Fatal(e)
+		}
+		s.cover, e = ui.DecodeBitmap(b)
+		if e != nil {
+			t.Fatal(e)
+		}
+		s.results[0] = track
+		s.images[track.Cover] = s.cover
+	}
 	s.current = &s.results[0]
 	s.duration = 258 * time.Second
 	s.position = 36 * time.Second
 	s.playing = true
 	s.lines = lyrics.Parse("[00:00]让音乐陪伴每一个日常\n[00:30]此刻的旋律，留在小小的窗口里")
-	for _, name := range []string{"main", "main-playing", "song-menu", "list-tools", "player", "settings", "mini", "mini-paused", "lyrics"} {
+	if fixture := os.Getenv("MUSIC_DL_REVIEW_FIXTURE"); fixture != "" {
+		b, e := os.ReadFile(filepath.Join(fixture, "lyrics.lrc"))
+		if e != nil {
+			t.Fatal(e)
+		}
+		s.lines = lyrics.Parse(string(b))
+		data, _ := json.Marshal(s.lines)
+		_ = os.WriteFile(filepath.Join(dir, "lyric-groups.json"), data, 0600)
+		s.position = 63 * time.Second
+		s.duration = time.Duration(s.current.Duration) * time.Second
+	}
+	for _, name := range []string{"main", "main-playing", "song-menu", "list-tools", "player", "settings", "about", "about-no-updates", "mini", "mini-paused", "mini-hover", "lyrics", "lyrics-more", "playlists", "playlist-editor", "collection-picker", "rankings", "recommend", "history", "downloads", "download-history"} {
 		s.playing = name != "main" && name != "song-menu" && name != "mini-paused"
 		s.modal = ""
 		s.toolsOpen, s.songMenuOpen, s.lyricOpen = false, false, false
+		s.previewActionsOpen = false
+		s.updateStatus = ""
+		s.page = "library"
+		s.collectionKind = "song"
+		s.collections = nil
 		s.playerExpanded = name == "player"
 		view := s.view
 		w, h := 1080, 740
-		if name == "mini" || name == "mini-paused" {
+		if name == "mini" || name == "mini-paused" || name == "mini-hover" {
 			view = s.miniView
-			w, h = 304, 50
+			w, h = 236, 50
 		}
 		if name == "settings" {
 			s.modal = "settings"
 		}
-		if name == "lyrics" {
-			s.lyricOpen = true
+		if name == "about" || name == "about-no-updates" {
+			s.modal = "about"
+			if name == "about-no-updates" {
+				s.updateStatus = "暂无可用更新"
+			}
 		}
+		if name == "lyrics" || name == "lyrics-more" {
+			s.lyricOpen = true
+			s.previewActionsOpen = name == "lyrics-more"
+		}
+		if name == "playlists" || name == "playlist-editor" || name == "collection-picker" {
+			s.cfg.Playlists = []library.Playlist{{ID: "review", Name: "睡前听的歌", Description: "轻柔的旋律", Tracks: append([]library.Track(nil), s.results...)}}
+			if name == "playlists" {
+				s.openSavedPlaylists()
+				h = 1000
+			}
+			if name == "playlist-editor" {
+				s.editPlaylist(nil)
+			}
+			if name == "collection-picker" {
+				s.pendingTracks = []library.Track{s.results[0]}
+				s.modal = "collections"
+			}
+		}
+
+		if name == "rankings" || name == "recommend" {
+			h = 1000
+			s.collectionKind = "ranks"
+			if name == "recommend" {
+				s.collectionKind = "recommend"
+			}
+			for i, title := range []string{"飙升榜", "新歌榜", "原创榜", "热歌榜"} {
+				s.collections = append(s.collections, library.Collection{Playlist: model.Playlist{ID: fmt.Sprint(i), Source: "netease", Name: title, TrackCount: 100, PlayCount: 2380000, Extra: map[string]string{"update_frequency": "每天更新"}}, Kind: "rank"})
+			}
+		}
+
+		if name == "history" {
+			s.modal = "history"
+			s.cfg.History = append([]library.Track(nil), s.results...)
+		}
+		if name == "downloads" || name == "download-history" {
+			s.modal = "downloads"
+			s.downloadTab = ""
+			if name == "download-history" {
+				s.downloadTab = "history"
+			}
+			s.jobs = []download.Job{{Track: s.results[0], State: "downloading", Done: 1500000, Total: 5000000}, {Track: s.results[1], State: "done", Done: 3000000, Total: 3000000}, {Track: s.results[2], State: "queued"}}
+		}
+
 		tt := ui.NewTester(view, w, h)
+		tt.Advance(time.Second)
+		if name == "mini-hover" {
+			tt.Move(120, 25)
+			tt.Advance(time.Second)
+		}
 		if name == "song-menu" {
-			if err := tt.Click("更多操作 夜に駆ける"); err != nil {
+			if err := tt.Click("更多操作 " + s.results[0].Name); err != nil {
 				t.Fatal(err)
 			}
 		}
