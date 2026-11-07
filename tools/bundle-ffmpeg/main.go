@@ -37,7 +37,7 @@ type builder struct {
 }
 
 func main() {
-	target := flag.String("platform", runtime.GOOS+"-"+runtime.GOARCH, "windows-amd64, darwin-amd64 or darwin-arm64")
+	target := flag.String("platform", runtime.GOOS+"-"+runtime.GOARCH, "windows-amd64 or darwin-arm64")
 	jobs := flag.Int("jobs", max(1, min(6, runtime.NumCPU())), "parallel compiler jobs")
 	flag.Parse()
 	if err := build(*target, *jobs); err != nil {
@@ -46,7 +46,7 @@ func main() {
 	}
 }
 func build(target string, jobs int) error {
-	if target != "windows-amd64" && target != "darwin-amd64" && target != "darwin-arm64" {
+	if target != "windows-amd64" && target != "darwin-arm64" {
 		return fmt.Errorf("unsupported desktop platform %s", target)
 	}
 	if strings.HasPrefix(target, "darwin-") && runtime.GOOS != "darwin" {
@@ -85,9 +85,7 @@ func build(target string, jobs int) error {
 		b.strip = "x86_64-w64-mingw32-strip"
 		ldflags = "-static-libgcc -static-libstdc++ -Wl,--gc-sections"
 	} else {
-		if target == "darwin-arm64" {
-			b.arch = "arm64"
-		}
+		b.arch = "arm64"
 		cflags += " -arch " + b.arch + " -mmacosx-version-min=13.0"
 		ldflags = "-arch " + b.arch + " -mmacosx-version-min=13.0"
 	}

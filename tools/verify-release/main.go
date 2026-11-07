@@ -42,14 +42,12 @@ func verify(c config, root, out string) error {
 		return fmt.Errorf("invalid update public key")
 	}
 	expected := map[string]string{}
-	for _, target := range []string{"windows-amd64", "darwin-amd64", "darwin-arm64"} {
+	for _, target := range []string{"windows-amd64", "darwin-arm64"} {
 		expected[c.Slug+"-"+c.Version+"-"+target+".tar.gz"] = ""
 		expected["update-"+target+".json"] = ""
 	}
 	expected[c.Slug+"-setup-"+c.Version+"-amd64.exe"] = ""
-	for _, arch := range []string{"amd64", "arm64"} {
-		expected[c.Slug+"-"+c.Version+"-"+arch+".dmg"] = ""
-	}
+	expected[c.Slug+"-"+c.Version+"-arm64.dmg"] = ""
 	if err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -87,7 +85,7 @@ func verify(c config, root, out string) error {
 		}
 		hashes[name] = h.Sum(nil)
 	}
-	for _, target := range []string{"windows-amd64", "darwin-amd64", "darwin-arm64"} {
+	for _, target := range []string{"windows-amd64", "darwin-arm64"} {
 		var m manifest
 		data, err := os.ReadFile(expected["update-"+target+".json"])
 		if err != nil {

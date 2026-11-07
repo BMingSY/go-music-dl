@@ -17,11 +17,9 @@
 
 ## 安装
 
-从 [Releases](https://github.com/BMingSY/go-music-dl/releases) 下载 Windows 11 x64 或 macOS 13+ 安装包。macOS 分为 Apple Silicon 和 Intel 两个版本。
+从 [Releases](https://github.com/BMingSY/go-music-dl/releases) 下载 Windows 11 x64 或 macOS 13+（Apple Silicon）安装包。
 
 ## 开发
-
-`cmd/music-dl` 为启动入口，`internal/desktop` 包含桌面界面与交互，`internal/assets` 保存图标和字体。音乐源、下载、歌词和解码分别位于 `internal/library`、`internal/download`、`internal/lyrics` 和 `internal/playback`。
 
 需要 Go 1.27.3。开发时需安装 FFmpeg 和 ffprobe，或在设置中指定路径。
 

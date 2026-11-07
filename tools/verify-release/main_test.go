@@ -22,7 +22,7 @@ func releaseFixture(t *testing.T) (config, string) {
 	c.Updates.PublicKey = base64.StdEncoding.EncodeToString(pub)
 	c.Updates.GitHub, c.Updates.TagPrefix = "BMingSY/go-music-dl", "native-v"
 	root := t.TempDir()
-	for _, target := range []string{"windows-amd64", "darwin-amd64", "darwin-arm64"} {
+	for _, target := range []string{"windows-amd64", "darwin-arm64"} {
 		name := "music-dl-0.1.0-" + target + ".tar.gz"
 		data := []byte("signed fixture " + target)
 		sum := sha256.Sum256(data)
@@ -34,7 +34,7 @@ func releaseFixture(t *testing.T) (config, string) {
 		writeFixture(t, root, name, data)
 		writeFixture(t, root, "update-"+target+".json", encoded)
 	}
-	for _, name := range []string{"music-dl-setup-0.1.0-amd64.exe", "music-dl-0.1.0-amd64.dmg", "music-dl-0.1.0-arm64.dmg"} {
+	for _, name := range []string{"music-dl-setup-0.1.0-amd64.exe", "music-dl-0.1.0-arm64.dmg"} {
 		writeFixture(t, root, name, []byte("installer fixture"))
 	}
 	return c, root
@@ -49,6 +49,9 @@ func writeFixture(t *testing.T, root, name string, data []byte) {
 
 func TestVerifyRelease(t *testing.T) {
 	c, root := releaseFixture(t)
+	// Stale artifacts from the retired platform must not be published.
+	writeFixture(t, root, "music-dl-0.1.0-amd64.dmg", []byte("retired Intel installer"))
+	writeFixture(t, root, "update-darwin-amd64.json", []byte("retired Intel manifest"))
 	out := filepath.Join(t.TempDir(), "release-assets")
 	if err := verify(c, root, out); err != nil {
 		t.Fatal(err)
@@ -57,14 +60,14 @@ func TestVerifyRelease(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(files) != 10 {
-		t.Fatalf("got %d assets, want 9 assets and checksums", len(files))
+	if len(files) != 7 {
+		t.Fatalf("got %d assets, want 6 assets and checksums", len(files))
 	}
 	sums, err := os.ReadFile(filepath.Join(out, "SHA256SUMS"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(strings.Split(strings.TrimSpace(string(sums)), "\n")) != 9 {
+	if len(strings.Split(strings.TrimSpace(string(sums)), "\n")) != 6 {
 		t.Fatal("checksums do not cover every published asset")
 	}
 }

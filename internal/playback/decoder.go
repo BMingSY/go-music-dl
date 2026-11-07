@@ -33,12 +33,16 @@ type Input struct {
 type process struct {
 	cmd           *exec.Cmd
 	out           io.ReadCloser
+	source        *streamSource
 	start, frames int64 // seek offset and decoded frames, protected by Decoder.mu
 	done          chan struct{}
 	err           error // published by closing done
 }
 
 func (p *process) stop() {
+	if p.source != nil {
+		p.source.Close()
+	}
 	_ = p.out.Close()
 	_ = p.cmd.Process.Kill()
 	<-p.done
@@ -136,11 +140,28 @@ func (d *Decoder) start(frame int64) (*process, error) {
 	if err != nil {
 		return nil, err
 	}
+	input := d.input
+	var source *streamSource
+	if strings.HasPrefix(input.Location, "http://") || strings.HasPrefix(input.Location, "https://") {
+		source, err = newStreamSource(input)
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			if err != nil {
+				source.Close()
+			}
+		}()
+		input.Location = source.url
+		// This private loopback hop must bypass system HTTP proxies. Remote
+		// authentication and retries are handled by streamSource.
+		netArgs = []string{"-rw_timeout", "45000000", "-http_proxy", ""}
+	}
 	args = append(args, netArgs...)
 	if frame > 0 {
 		args = append(args, "-ss", strconv.FormatFloat(float64(frame)/Rate, 'f', 6, 64))
 	}
-	args = append(args, "-i", d.input.Location, "-map", "0:a:0", "-vn", "-sn", "-dn", "-ac", "2", "-ar", strconv.Itoa(Rate), "-f", "f32le", "pipe:1")
+	args = append(args, "-i", input.Location, "-map", "0:a:0", "-vn", "-sn", "-dn", "-ac", "2", "-ar", strconv.Itoa(Rate), "-f", "f32le", "pipe:1")
 	cmd := exec.Command(d.ffmpeg, args...)
 	quietProcess(cmd)
 	// Do not put signed URLs or cookies from ffmpeg's diagnostics in logs/UI.
@@ -156,8 +177,14 @@ func (d *Decoder) start(frame int64) (*process, error) {
 		return nil, errors.New("无法启动 FFmpeg 解码器")
 	}
 	writer.Close()
-	p := &process{cmd: cmd, out: out, start: max(0, frame), done: make(chan struct{})}
-	go func() { p.err = cmd.Wait(); close(p.done) }()
+	p := &process{cmd: cmd, out: out, source: source, start: max(0, frame), done: make(chan struct{})}
+	go func() {
+		p.err = cmd.Wait()
+		if source != nil {
+			source.Close()
+		}
+		close(p.done)
+	}()
 	return p, nil
 }
 
