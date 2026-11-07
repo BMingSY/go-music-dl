@@ -188,11 +188,12 @@ func TestRenderPreview(t *testing.T) {
 		s.position = 63 * time.Second
 		s.duration = time.Duration(s.current.Duration) * time.Second
 	}
-	for _, name := range []string{"main", "main-playing", "song-menu", "list-tools", "player", "settings", "mini", "mini-paused", "mini-hover", "lyrics", "lyrics-more", "playlists", "playlist-editor", "collection-picker", "rankings", "recommend", "history", "downloads", "download-history"} {
+	for _, name := range []string{"main", "main-playing", "song-menu", "list-tools", "player", "settings", "about", "about-no-updates", "mini", "mini-paused", "mini-hover", "lyrics", "lyrics-more", "playlists", "playlist-editor", "collection-picker", "rankings", "recommend", "history", "downloads", "download-history"} {
 		s.playing = name != "main" && name != "song-menu" && name != "mini-paused"
 		s.modal = ""
 		s.toolsOpen, s.songMenuOpen, s.lyricOpen = false, false, false
 		s.previewActionsOpen = false
+		s.updateStatus = ""
 		s.page = "library"
 		s.collectionKind = "song"
 		s.collections = nil
@@ -205,6 +206,12 @@ func TestRenderPreview(t *testing.T) {
 		}
 		if name == "settings" {
 			s.modal = "settings"
+		}
+		if name == "about" || name == "about-no-updates" {
+			s.modal = "about"
+			if name == "about-no-updates" {
+				s.updateStatus = "暂无可用更新"
+			}
 		}
 		if name == "lyrics" || name == "lyrics-more" {
 			s.lyricOpen = true

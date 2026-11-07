@@ -9,6 +9,7 @@ import (
 	"image/color"
 	"image/draw"
 	"image/png"
+	"log"
 	"math/rand/v2"
 	"path/filepath"
 	"runtime"
@@ -43,6 +44,7 @@ type app struct {
 	queueOpen, playerVolumeOpen, speedOpen                            bool
 	queueScroll                                                       ui.ScrollState
 	queueReveal                                                       bool
+	revealTrack                                                       string
 	previewActionsOpen                                                bool
 	speed                                                             float64
 	queryFocused                                                      bool
@@ -97,6 +99,7 @@ type app struct {
 	searchID, playID            uint64
 	playCancel                  context.CancelFunc
 	updateBusy                  bool
+	updateStatus                string
 	updateProgress              float64
 }
 
@@ -516,25 +519,28 @@ func (s *app) checkUpdate() {
 	if s.updateBusy {
 		return
 	}
+	s.modal = "about"
 	if !mygo.Updater.Enabled() {
-		s.status = "此构建无法更新，请使用安装包并确认安装目录可写。"
+		s.updateStatus = "此安装暂不支持自动更新，请使用安装包更新。"
 		return
 	}
 	s.updateBusy = true
-	s.status = "正在检查更新…"
+	s.updateProgress = 0
+	s.updateStatus = "正在检查更新…"
 	go func() {
 		up, err := mygo.Updater.Check(s.ctx)
 		if err != nil {
-			s.update(func() { s.updateBusy = false; s.status = "检查更新失败: " + err.Error() })
+			log.Printf("checking for updates: %v", err)
+			s.update(func() { s.updateBusy = false; s.updateStatus = updateCheckMessage(err) })
 			return
 		}
 		if up == nil {
-			s.update(func() { s.updateBusy = false; s.status = "已经是最新版本" })
+			s.update(func() { s.updateBusy = false; s.updateStatus = updateCheckMessage(nil) })
 			return
 		}
 		res, err := mygo.Dialog.Message(mygo.MessageOptions{Parent: s.win, Message: "发现新版本 " + up.Version, Detail: "下载完成后将自动重启更新。", Buttons: []string{"下载并重启", "稍后"}})
 		if err != nil || res.Button != 0 {
-			s.update(func() { s.updateBusy = false })
+			s.update(func() { s.updateBusy = false; s.updateStatus = "发现新版本 " + up.Version })
 			return
 		}
 		err = up.Install(s.ctx, func(n, total int64) {
@@ -542,13 +548,14 @@ func (s *app) checkUpdate() {
 				if total > 0 {
 					s.updateProgress = float64(n) / float64(total)
 				}
-				s.status = fmt.Sprintf("正在下载更新 %.0f%%", s.updateProgress*100)
+				s.updateStatus = fmt.Sprintf("正在下载更新 %.0f%%", s.updateProgress*100)
 			})
 		})
 		s.update(func() {
 			s.updateBusy = false
 			if err != nil {
-				s.status = "更新失败: " + err.Error()
+				log.Printf("installing update: %v", err)
+				s.updateStatus = "更新失败，请稍后重试。"
 				return
 			}
 			s.save()

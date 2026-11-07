@@ -272,7 +272,7 @@ func (s *app) trackCard(c *ui.Context, t library.Track, i int, tracks []library.
 		bg = ui.Hex("#eff3ff")
 		bd = accent
 	}
-	row := ui.Row(c.Key(t.Key())).MinHeight(112).Padding(15).AlignItems(ui.Center).Background(bg).Border(2, bd).Radius(16).Shadow(0, 4, 6, 0, ui.RGBA(0, 0, 0, .05))
+	row := ui.Row(c.Key(t.Key())).Label("歌曲 "+t.Name).MinHeight(112).Padding(15).AlignItems(ui.Center).Background(bg).Border(2, bd).Radius(16).Shadow(0, 4, 6, 0, ui.RGBA(0, 0, 0, .05))
 	if active {
 		row.Shadow(0, 8, 20, 0, accent.Alpha(.25))
 		row.AnimatePose(ui.Pose{Scale: 1.01}, hoverAnimation)
@@ -280,6 +280,11 @@ func (s *app) trackCard(c *ui.Context, t library.Track, i int, tracks []library.
 		cardMotion(row, 3)
 	}
 	row.Children(func() {
+		if s.revealTrack == t.Key() {
+			// Include room below the card so it clears the fixed player bar.
+			ui.Box(c.Key("current-track-target")).Absolute().Left(0).Top(0).Width(1).Height(192).PassThrough().ScrollIntoView()
+			s.revealTrack = ""
+		}
 		if s.batch {
 			selected := s.checked[t.Key()]
 			if ui.Checkbox(c, &selected, "").Label("选择 " + t.Name).Changed() {
@@ -423,12 +428,7 @@ func (s *app) toolbar(c *ui.Context, h float32) {
 		}
 		ui.Divider(c).Width(20).MarginY(4)
 		iconButton(c, "top", "up", "回到顶部", 36).OnClick(func() { s.scroll.ScrollTo(0, 0, ui.Smooth) })
-		iconButton(c, "current", "headphones", "定位当前播放歌曲", 36).OnClick(func() {
-			s.page = "queue"
-			s.collections = nil
-			s.pageNumber = 1
-			s.scroll.ScrollTo(0, 350, ui.Smooth)
-		})
+		iconButton(c, "current", "headphones", "定位当前播放歌曲", 36).Disabled(s.current == nil).OnClick(s.locateCurrentTrack)
 	})
 }
 func (s *app) cycleMode() {
