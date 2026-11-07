@@ -188,13 +188,12 @@ func TestRenderPreview(t *testing.T) {
 		s.position = 63 * time.Second
 		s.duration = time.Duration(s.current.Duration) * time.Second
 	}
-	for _, name := range []string{"main", "main-playing", "song-menu", "list-tools", "player", "settings", "mini", "mini-paused", "mini-hover", "lyrics", "playlists", "playlist-editor", "collection-picker", "categories", "rankings", "recommend", "history", "downloads", "download-history"} {
+	for _, name := range []string{"main", "main-playing", "song-menu", "list-tools", "player", "settings", "mini", "mini-paused", "mini-hover", "lyrics", "playlists", "playlist-editor", "collection-picker", "rankings", "recommend", "history", "downloads", "download-history"} {
 		s.playing = name != "main" && name != "song-menu" && name != "mini-paused"
 		s.modal = ""
 		s.toolsOpen, s.songMenuOpen, s.lyricOpen = false, false, false
 		s.page = "library"
 		s.collectionKind = "song"
-		s.categories = nil
 		s.collections = nil
 		s.playerExpanded = name == "player"
 		view := s.view
@@ -224,11 +223,6 @@ func TestRenderPreview(t *testing.T) {
 			}
 		}
 
-		if name == "categories" {
-			h = 1000
-			s.collectionKind = "categories"
-			s.categories = []model.PlaylistCategory{{ID: "zh", Name: "华语", Group: "语种", Hot: true}, {ID: "en", Name: "欧美", Group: "语种", Hot: true}, {ID: "jp", Name: "日语", Group: "语种"}, {ID: "pop", Name: "流行", Group: "风格", Hot: true}, {ID: "rock", Name: "摇滚", Group: "风格"}, {ID: "quiet", Name: "安静", Group: "情感"}}
-		}
 		if name == "rankings" || name == "recommend" {
 			h = 1000
 			s.collectionKind = "ranks"

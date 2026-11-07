@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/BMingSY/go-music-dl/internal/download"
-	"github.com/guohuiyuan/music-lib/model"
 	"image"
 	"image/color"
 	"image/draw"
@@ -50,7 +49,6 @@ type app struct {
 	selected                                                          map[string]bool
 	searchKind                                                        string
 	collections                                                       []library.Collection
-	categories                                                        []model.PlaylistCategory
 	collectionTitle, collectionKind, collectionID                     string
 	scroll                                                            ui.ScrollState
 	modal, settingsTab, playlistName                                  string
@@ -239,7 +237,6 @@ func (s *app) selectSource(source string) {
 	s.page = "library"
 	s.selected = map[string]bool{source: true}
 	s.collections = nil
-	s.categories = nil
 	s.collectionTitle = ""
 	s.pageNumber = 1
 	s.results = nil

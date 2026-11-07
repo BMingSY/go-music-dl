@@ -55,14 +55,10 @@ func (s *app) view(c *ui.Context) {
 					s.browseCurrentView(c)
 					if s.page == "playlists" {
 						s.localPlaylistsView(c)
-					} else if s.page == "library" && s.collectionKind == "categories" {
-						s.categoriesView(c)
 					} else if s.page == "library" && s.collectionKind == "ranks" {
 						s.rankingsView(c)
 					} else if s.page == "library" && (s.collectionKind == "recommend" || s.collectionKind == "mine") {
 						s.sourcePlaylistsView(c)
-					} else if s.page == "library" && len(s.categories) > 0 {
-						s.categoriesView(c)
 					} else if s.page == "library" && len(s.collections) > 0 {
 						s.collectionsView(c)
 					} else {
@@ -132,7 +128,6 @@ func (s *app) searchBox(c *ui.Context) {
 			pill(c, "fire", "每日推荐歌单", "#ff9a9e", "#fecfef", func() { s.browse("recommend", "netease", "") })
 			pill(c, "folder", "本地歌单", "#f68084", "#f68084", s.openSavedPlaylists)
 			pill(c, "music", "本地音乐", "#f68084", "#f68084", s.localMusic)
-			pill(c, "grid", "歌单分类", "#38bdf8", "#6366f1", func() { s.browse("categories", "netease", "") })
 			pill(c, "ranking", "排行榜", "#fb923c", "#ef4444", func() { s.browse("ranks", "netease", "") })
 			pill(c, "heart", "我的歌单", "#34d399", "#06b6d4", func() { s.browse("mine", "netease", "") })
 		})
@@ -431,7 +426,6 @@ func (s *app) toolbar(c *ui.Context, h float32) {
 		iconButton(c, "current", "headphones", "定位当前播放歌曲", 36).OnClick(func() {
 			s.page = "queue"
 			s.collections = nil
-			s.categories = nil
 			s.pageNumber = 1
 			s.scroll.ScrollTo(0, 350, ui.Smooth)
 		})

@@ -28,7 +28,6 @@ type Collection struct {
 type Catalog struct {
 	Tracks      []Track
 	Collections []Collection
-	Categories  []model.PlaylistCategory
 	Container   *Collection
 }
 type collectionProvider interface {
@@ -83,7 +82,7 @@ func Browse(ctx context.Context, source, kind, query, id string, page int, cfg C
 		} else {
 			lists, err = n.SearchAlbum(query)
 		}
-	case "recommend", "mine", "categories", "category", "ranks", "rank":
+	case "recommend", "mine", "ranks", "rank":
 		n, ok := p.(*netease.Netease)
 		if !ok {
 			return result, errors.New("此功能支持网易云音乐")
@@ -93,10 +92,6 @@ func Browse(ctx context.Context, source, kind, query, id string, page int, cfg C
 			lists, err = n.GetRecommendedPlaylists()
 		case "mine":
 			lists, err = n.GetUserPlaylists(max(page, 1), 30)
-		case "categories":
-			result.Categories, err = n.GetPlaylistCategories()
-		case "category":
-			lists, err = n.GetCategoryPlaylists(id, max(page, 1), 30)
 		case "ranks":
 			var ranks []model.TopList
 			ranks, err = n.GetTopLists()

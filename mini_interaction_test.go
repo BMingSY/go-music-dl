@@ -99,3 +99,16 @@ func TestTrackCardOnlyShowsAvailableAudioFields(t *testing.T) {
 		t.Fatal("missing one field hid another known field")
 	}
 }
+
+func TestDesktopBrowseEntries(t *testing.T) {
+	s := newApp(context.Background(), library.Config{}, "")
+	tt := ui.NewTester(s.view, 1080, 740)
+	if _, ok := tt.Find("歌单分类"); ok {
+		t.Fatal("removed category entry is still visible")
+	}
+	for _, label := range []string{"每日推荐歌单", "本地歌单", "本地音乐", "排行榜", "我的歌单"} {
+		if _, ok := tt.Find(label); !ok {
+			t.Fatalf("remaining entry %q is missing", label)
+		}
+	}
+}

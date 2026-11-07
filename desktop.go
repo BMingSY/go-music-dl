@@ -86,7 +86,6 @@ func (s *app) browse(kind, source, id string) {
 			} else {
 				all.Tracks = append(all.Tracks, r.data.Tracks...)
 				all.Collections = append(all.Collections, r.data.Collections...)
-				all.Categories = append(all.Categories, r.data.Categories...)
 				if r.data.Container != nil {
 					all.Container = r.data.Container
 				}
@@ -99,7 +98,6 @@ func (s *app) browse(kind, source, id string) {
 			s.searching = false
 			s.results = all.Tracks
 			s.collections = all.Collections
-			s.categories = all.Categories
 			s.checked = map[string]bool{}
 			s.list = ui.ListState{}
 			s.status = strings.Join(errs, "；")
@@ -110,7 +108,7 @@ func (s *app) browse(kind, source, id string) {
 				s.collectionID = all.Container.ID
 				s.searchKind = all.Container.Kind
 			}
-			if len(all.Tracks)+len(all.Collections)+len(all.Categories) == 0 && s.status == "" {
+			if len(all.Tracks)+len(all.Collections) == 0 && s.status == "" {
 				s.status = "没有找到结果"
 			}
 			s.redraw()

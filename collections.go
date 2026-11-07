@@ -17,7 +17,6 @@ func (s *app) openSavedPlaylists() {
 	s.cancelBrowse()
 	s.page = "playlists"
 	s.collections = nil
-	s.categories = nil
 	s.collectionTitle = ""
 	s.pendingTracks = nil
 	s.playlistError = ""
@@ -191,7 +190,6 @@ func (s *app) openSavedPlaylist(p library.Playlist) {
 	s.localPlaylistID = p.ID
 	s.collectionTitle = p.Name
 	s.currentCollection = nil
-	s.categories = nil
 	s.collections = nil
 	s.pageNumber = 1
 	s.scroll = ui.ScrollState{}
@@ -288,7 +286,6 @@ func (s *app) openLocalPlaylist(p library.Playlist) {
 		s.pageNumber = 1
 		s.collectionTitle = ""
 		s.collections = nil
-		s.categories = nil
 		s.scroll = ui.ScrollState{}
 		return
 	}

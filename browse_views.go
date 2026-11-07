@@ -34,70 +34,6 @@ func (s *app) browseEmpty(c *ui.Context) bool {
 	}
 	return false
 }
-func (s *app) categoriesView(c *ui.Context) {
-	browsePanel(c, "grid", "歌单分类", "选择音乐源，挑选喜欢的分类，进入对应歌单列表。", len(s.categories), func() {
-		if s.browseEmpty(c) {
-			return
-		}
-		var groups []string
-		for _, cat := range s.categories {
-			name := cat.Group
-			if name == "" {
-				name = "其他"
-			}
-			found := false
-			for _, g := range groups {
-				if g == name {
-					found = true
-					break
-				}
-			}
-			if !found {
-				groups = append(groups, name)
-			}
-		}
-		ui.Column(c).Gap(16).Children(func() {
-			for _, group := range groups {
-				ui.Column(c.Key(group)).Children(func() {
-					ui.Row(c).Gap(10).AlignItems(ui.Center).Margin(0, 0, 10, 0).Children(func() {
-						ui.Text(c, group).FontSize(12).FontWeight(800).LetterSpacing(.72).TextColor(muted)
-						ui.Box(c).Height(1).Grow(1).Gradient(border, ui.Transparent, 90)
-					})
-					ui.Row(c).Wrap().Gap(8).Children(func() {
-						for _, cat := range s.categories {
-							name := cat.Group
-							if name == "" {
-								name = "其他"
-							}
-							if name != group {
-								continue
-							}
-							button := ui.Button(c.Key(cat.ID), "").Label("分类 "+cat.Name).Padding(8, 14).Radius(30).Background(ui.Hex("#f8fafc")).Border(1.5, border).OnClick(func() { s.browse("category", "netease", cat.ID); s.collectionTitle = cat.Name })
-							color := ui.Hex("#334155")
-							if cat.Hot {
-								button.Gradient(ui.Hex("#fff7ed"), ui.Hex("#ffedd5"), 135).Border(1.5, ui.Hex("#fdba74"))
-								color = ui.Hex("#c2410c")
-							}
-							if button.Hovered() {
-								button.Border(1.5, accent).Background(ui.Hex("#f0fdf4"))
-								color = ui.Hex("#059669")
-							}
-							buttonMotion(button, 1, 1)
-							button.Children(func() {
-								ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-									ui.Text(c, cat.Name).FontSize(13).FontWeight(600).TextColor(color)
-									if cat.Hot {
-										ui.Text(c, "HOT").FontSize(9).FontWeight(800).LineHeight(1).Padding(3, 5).Radius(4).Gradient(ui.Hex("#fb7185"), ui.Hex("#f97316"), 135).TextColor(white)
-									}
-								})
-							})
-						}
-					})
-				})
-			}
-		})
-	})
-}
 func (s *app) sourcePlaylistsView(c *ui.Context) {
 	title, icon, subtitle := "每日推荐歌单", "fire", "按渠道查看各平台为你推荐的歌单。"
 	if s.collectionKind == "mine" {
@@ -202,13 +138,10 @@ func compactCount(n int) string {
 	return fmt.Sprint(n)
 }
 func (s *app) browseCurrentView(c *ui.Context) {
-	if s.page != "library" || s.collectionTitle == "" || (s.collectionKind != "category" && s.collectionKind != "rank") {
+	if s.page != "library" || s.collectionTitle == "" || s.collectionKind != "rank" {
 		return
 	}
-	label, back, icon, description := "当前分类", "返回分类", "grid", "点击歌单卡片可进入详情，或返回选择其他分类。"
-	if s.collectionKind == "rank" {
-		label, back, icon, description = "当前榜单", "返回排行榜", "ranking", "点击歌曲即可播放或下载，也可以导入到本地歌单。"
-	}
+	label, back, icon, description := "当前榜单", "返回排行榜", "ranking", "点击歌曲即可播放或下载，也可以导入到本地歌单。"
 	ui.Row(c).Padding(14, 18).Gap(14).Margin(0, 0, 18, 0).Radius(16).Background(white.Alpha(.95)).Border(1, white.Alpha(.5)).AlignItems(ui.Center).Children(func() {
 		ui.Column(c).Grow(1).Children(func() {
 			ui.Row(c).Gap(6).Padding(3, 10).AlignSelf(ui.Start).Radius(30).Background(ui.Hex("#ecfdf5")).Border(1, ui.Hex("#bbf7d0")).Children(func() { glyph(c, icon, 12, accent); ui.Text(c, label).FontSize(12).Bold().TextColor(accent) })
@@ -216,11 +149,7 @@ func (s *app) browseCurrentView(c *ui.Context) {
 			ui.Text(c, description).FontSize(12).TextColor(muted).Margin(4, 0, 0, 0)
 		})
 		ui.Button(c, "← "+back).Padding(8, 18).Radius(20).FontSize(14).FontWeight(600).Background(ui.Hex("#fff7ed")).TextColor(ui.Hex("#9a3412")).Border(1, ui.Hex("#fed7aa")).OnClick(func() {
-			kind := "categories"
-			if s.collectionKind == "rank" {
-				kind = "ranks"
-			}
-			s.browse(kind, "netease", "")
+			s.browse("ranks", "netease", "")
 		})
 	})
 }
