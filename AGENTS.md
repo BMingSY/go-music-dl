@@ -1,5 +1,6 @@
 # Development
 
+- Do not modify `README.md` unless the user explicitly requests changes to it.
 - Use a topic branch and one PR targeting `custom` for related changes. Do not push implementation commits directly to `main` or `custom`.
 - All PR/MR titles must use a Conventional Commits prefix: `feat:`, `fix:`, `docs:`, `style:`, `refactor:`, `perf:`, `test:`, `build:`, `ci:`, `chore:`, or `revert:`. An optional scope and breaking-change marker are allowed, e.g. `fix(playback): resume interrupted audio` or `feat!: change the library format`. Follow the prefix with a space and a non-empty summary; keep the title aligned with the final scope of the change.
 - Go with MyGo native UI only. Support Windows 11 x64 and macOS Intel/Apple Silicon; sources are netease, bilibili and local.
