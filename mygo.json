@@ -3,6 +3,7 @@
   "slug": "music-dl",
   "identifier": "io.github.bmingsy.musicdl",
   "version": "0.1.2",
+  "main": "./cmd/music-dl",
   "out": "dist",
   "windows": {
     "displayName": "music-dl",
@@ -11,9 +12,9 @@
   "linux": {
     "webview": false
   },
-  "icon": "assets/icon.png",
+  "icon": "internal/assets/icon.png",
   "macos": {
-    "icon": "assets/icon.icns",
+    "icon": "internal/assets/icon.icns",
     "minimumSystemVersion": "13.0"
   },
   "updates": {

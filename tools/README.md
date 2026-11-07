@@ -1,6 +1,6 @@
 # Build assets
 
-The checked-in icon fonts contain only glyphs used in `assets.go`. To regenerate them after adding an icon:
+The fonts in `internal/assets` contain only glyphs used in `internal/desktop/assets.go`. To regenerate them after adding an icon:
 
 ```sh
 python3 -m pip install fonttools==4.68.0

@@ -2,8 +2,8 @@
 /artifacts/
 /resources/windows-*/
 /resources/darwin-*/
-/native/
 *.exe
 *.key
 .DS_Store
 **/data/
+__pycache__/

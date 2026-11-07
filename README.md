@@ -21,10 +21,12 @@
 
 ## 开发
 
+`cmd/music-dl` 为启动入口，`internal/desktop` 包含桌面界面与交互，`internal/assets` 保存图标和字体。音乐源、下载、歌词和解码分别位于 `internal/library`、`internal/download`、`internal/lyrics` 和 `internal/playback`。
+
 需要 Go 1.27.3。开发时需安装 FFmpeg 和 ffprobe，或在设置中指定路径。
 
 ```sh
-go run .
+go run ./cmd/music-dl
 ```
 
 构建安装包前，按[媒体工具构建说明](tools/bundle-ffmpeg/README.md)准备对应平台的资源。
