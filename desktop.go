@@ -321,6 +321,10 @@ func (s *app) startLogin(source string) {
 	}()
 }
 func (s *app) closeModal() {
+	if s.modal == "update" {
+		s.modal = "about"
+		return
+	}
 	s.captureShortcut = ""
 	if s.modal == "login" && s.loginCancel != nil {
 		s.loginCancel()

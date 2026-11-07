@@ -13,6 +13,7 @@ import (
 	"github.com/BMingSY/go-music-dl/internal/download"
 	"github.com/BMingSY/go-music-dl/internal/library"
 	"github.com/BMingSY/go-music-dl/internal/lyrics"
+	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 	"github.com/guohuiyuan/music-lib/model"
 )
@@ -188,12 +189,13 @@ func TestRenderPreview(t *testing.T) {
 		s.position = 63 * time.Second
 		s.duration = time.Duration(s.current.Duration) * time.Second
 	}
-	for _, name := range []string{"main", "main-playing", "song-menu", "list-tools", "player", "settings", "about", "about-no-updates", "mini", "mini-paused", "mini-hover", "lyrics", "lyrics-more", "playlists", "playlist-editor", "collection-picker", "rankings", "recommend", "history", "downloads", "download-history"} {
+	for _, name := range []string{"main", "main-playing", "song-menu", "list-tools", "player", "settings", "about", "about-no-updates", "update", "update-downloading", "update-error", "mini", "mini-paused", "mini-hover", "lyrics", "lyrics-more", "playlists", "playlist-editor", "collection-picker", "rankings", "recommend", "history", "downloads", "download-history"} {
 		s.playing = name != "main" && name != "song-menu" && name != "mini-paused"
 		s.modal = ""
 		s.toolsOpen, s.songMenuOpen, s.lyricOpen = false, false, false
 		s.previewActionsOpen = false
 		s.updateStatus = ""
+		s.pendingUpdate, s.updateBusy, s.updateProgress = nil, false, 0
 		s.page = "library"
 		s.collectionKind = "song"
 		s.collections = nil
@@ -216,6 +218,16 @@ func TestRenderPreview(t *testing.T) {
 		if name == "lyrics" || name == "lyrics-more" {
 			s.lyricOpen = true
 			s.previewActionsOpen = name == "lyrics-more"
+		}
+		if name == "update" || name == "update-downloading" || name == "update-error" {
+			s.modal = "about"
+			s.offerUpdate(&mygo.Update{Version: "0.1.2"})
+			if name == "update-downloading" {
+				s.updateBusy, s.updateProgress, s.updateStatus = true, .37, "正在下载更新 37%"
+			}
+			if name == "update-error" {
+				s.updateStatus = "更新失败，请稍后重试。"
+			}
 		}
 		if name == "playlists" || name == "playlist-editor" || name == "collection-picker" {
 			s.cfg.Playlists = []library.Playlist{{ID: "review", Name: "睡前听的歌", Description: "轻柔的旋律", Tracks: append([]library.Track(nil), s.results...)}}

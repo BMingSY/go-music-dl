@@ -20,10 +20,15 @@ func (s *app) modalView(c *ui.Context, w, h float32) {
 		titles["edit-playlist"] = "编辑歌单"
 	}
 	titles["import-playlist"] = "导入歌单"
+	titles["update"] = "软件更新"
 	width, height := float32(640), min(h-40, 600)
 	if s.modal == "about" {
 		width = 420
 		height = min(h-40, 360)
+	}
+	if s.modal == "update" {
+		width = 420
+		height = min(h-40, 320)
 	}
 	if s.modal == "settings" {
 		width = 760
@@ -69,6 +74,8 @@ func (s *app) modalView(c *ui.Context, w, h float32) {
 					s.downloadsView(c)
 				case "about":
 					s.aboutView(c)
+				case "update":
+					s.updateView(c)
 				case "edit-playlist":
 					s.editPlaylistView(c)
 				case "import-playlist":
@@ -239,11 +246,51 @@ func (s *app) aboutView(c *ui.Context) {
 			})
 		}
 	})
-	ui.Button(c, "检查更新").Disabled(s.updateBusy).OnClick(s.checkUpdate)
+	if s.pendingUpdate != nil {
+		label := "下载更新"
+		if s.updateBusy {
+			label = "查看下载进度"
+		}
+		ui.Button(c, label).OnClick(func() { s.modal = "update" })
+	} else {
+		ui.Button(c, "检查更新").Disabled(s.updateBusy).OnClick(s.checkUpdate)
+	}
 	ui.Text(c, s.updateStatus).FontSize(13).TextColor(muted).MaxLines(5)
 	if s.updateBusy {
 		ui.Box(c).Height(5).Background(border).Radius(3).Children(func() { ui.Box(c).WidthPercent(float32(s.updateProgress * 100)).Height(5).Background(accent).Radius(3) })
 	}
+}
+
+func (s *app) updateView(c *ui.Context) {
+	if s.pendingUpdate == nil {
+		return
+	}
+	ui.Column(c).Gap(6).Children(func() {
+		ui.Text(c, "发现新版本 "+s.pendingUpdate.Version).FontSize(22).FontWeight(700).TextColor(accent)
+		ui.Text(c, "当前版本 "+mygo.App.Version()).FontSize(13).TextColor(muted)
+	})
+	ui.Text(c, "下载完成后将自动重启更新。").FontSize(14).TextColor(textColor)
+	if s.updateBusy {
+		ui.Column(c).Gap(8).Children(func() {
+			ui.Text(c, s.updateStatus).FontSize(13).TextColor(muted)
+			ui.Box(c).Height(6).Background(border).Radius(3).Clip().Children(func() {
+				ui.Box(c).WidthPercent(float32(s.updateProgress * 100)).Height(6).Background(accent).Radius(3)
+			})
+		})
+	} else if s.updateStatus != "发现新版本 "+s.pendingUpdate.Version {
+		ui.Text(c, s.updateStatus).FontSize(13).TextColor(muted).MaxLines(2)
+	}
+	ui.Spacer(c)
+	ui.Row(c).Gap(10).Justify(ui.End).Children(func() {
+		later := ui.Button(c, "稍后").Label("稍后").Height(40).Padding(8, 18).Radius(8).FontSize(14).Disabled(s.updateBusy).OnClick(s.closeModal)
+		label := "下载并重启"
+		if s.updateBusy {
+			label = "正在下载…"
+		}
+		download := ui.PrimaryButton(c, label).Label(label).Height(40).Padding(8, 18).Radius(8).FontSize(14).FontWeight(600).Disabled(s.updateBusy).OnClick(s.installUpdate)
+		buttonMotion(later, 1, 1)
+		buttonMotion(download, 1, 1)
+	})
 }
 
 func (s *app) playlistEditorModal(c *ui.Context, w, h float32) {
