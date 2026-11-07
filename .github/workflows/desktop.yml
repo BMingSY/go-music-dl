@@ -71,12 +71,27 @@ jobs:
             choco install ffmpeg --yes --no-progress --limit-output
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
-      - name: Install FFmpeg on macOS
+      - name: Cache macOS FFmpeg
         if: runner.os == 'macOS'
+        id: macos-media
+        uses: actions/cache@v4
+        with:
+          path: resources/${{ matrix.target }}/
+          key: ci-media-${{ matrix.target }}-${{ hashFiles('tools/bundle-ffmpeg/main.go') }}
+      - name: Build FFmpeg on macOS
+        if: runner.os == 'macOS' && steps.macos-media.outputs.cache-hit != 'true'
+        env:
+          MEDIA_TARGET: ${{ matrix.target }}
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
         run: |
-          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
-            brew install ffmpeg
-          fi
+          brew install cmake ninja meson pkg-config
+          go run ./tools/bundle-ffmpeg -platform "$MEDIA_TARGET"
+      - name: Use bundled FFmpeg on macOS
+        if: runner.os == 'macOS'
+        env:
+          MEDIA_TARGET: ${{ matrix.target }}
+        run: printf '%s\n' "$PWD/resources/$MEDIA_TARGET" >> "$GITHUB_PATH"
       - name: Verify native architecture and media tools
         env:
           EXPECTED_TARGET: ${{ matrix.target }}
@@ -92,6 +107,14 @@ jobs:
                   raise SystemExit(f'{name} is required for CI')
               subprocess.run([path, '-version'], check=True)
               if name == 'ffmpeg':
+                  for option, required in (('-filters', 'subtitles'),
+                                           ('-encoders', 'h264_mf' if os.name == 'nt' else 'h264_videotoolbox')):
+                      result = subprocess.run([path, '-hide_banner', option], check=True,
+                                              capture_output=True, text=True)
+                      available = {fields[1] for line in result.stdout.splitlines()
+                                   if len(fields := line.split()) >= 2}
+                      if required not in available:
+                          raise SystemExit(f'FFmpeg {required} support is required for CI')
                   with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as env:
                       env.write(f'MUSIC_DL_TEST_FFMPEG={path}\n')
           PY

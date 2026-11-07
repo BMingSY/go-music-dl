@@ -44,6 +44,10 @@ MUSIC_DL_REQUIRE_AUDIO_TESTS=1 go test -race ./...
 
 GitHub Actions 会在向 `custom` 提交 PR 或推送合并结果时检查工作流和 Go 格式，并分别在 Windows x64、macOS Intel 和 Apple Silicon 上运行 `go vet`、带 FFmpeg 的竞态测试、更新安装冒烟、界面渲染和原生窗口冒烟。界面截图与冒烟结果保留为 CI artifacts。CI 不依赖音频输出设备，音频解码由 FFmpeg 集成测试验证。
 
-PR/MR 标题须使用 `feat:`、`fix:`、`ci:` 等 Conventional Commits 前缀，修改标题时会重新校验。完整媒体工具构建和安装包流程独立保留，仅在推送 `native-v*` 标签或手动运行 **Desktop packages** 时触发；日常测试也可以手动运行 **CI**。
+macOS CI 使用项目自身的 FFmpeg 构建配方并缓存媒体工具，确保歌词字幕和视频编码功能齐全；Windows 使用支持这些功能的 FFmpeg。测试开始前会检查所需功能。
+
+PR/MR 标题须使用 `feat:`、`fix:`、`ci:` 等 Conventional Commits 前缀，修改标题时会重新校验。安装包构建和发布流程独立保留，仅在推送 `native-v*` 标签或手动运行 **Desktop packages** 时触发；日常测试也可以手动运行 **CI**。
+
+如果 fork 的 Actions 页面显示 **Workflows on this fork have been disabled**，需在该页面点击启用按钮解除 GitHub 对 fork 工作流的暂停。仓库权限显示已启用或单独启用某个工作流，并不代表这个暂停状态已经解除。
 
 基于 [go-music-dl](https://github.com/guohuiyuan/go-music-dl) 和 [music-lib](https://github.com/guohuiyuan/music-lib)，界面使用 [MyGo](https://github.com/egoist/mygo)。遵循 [AGPL-3.0](LICENSE) 许可。
