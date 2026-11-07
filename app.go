@@ -25,6 +25,7 @@ import (
 )
 
 type app struct {
+	miniDrag                                                          miniDragState
 	utilityPage                                                       int
 	downloadTab, downloadFilter                                       string
 	toastSeen                                                         string

@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/BMingSY/go-music-dl/internal/lyrics"
-	"github.com/egoist/mygo/ui"
 	"math"
 	"time"
+
+	"github.com/BMingSY/go-music-dl/internal/lyrics"
+	"github.com/egoist/mygo/ui"
 )
 
 func (s *app) coverView(c *ui.Context, size float32) {
@@ -17,6 +18,33 @@ func (s *app) coverView(c *ui.Context, size float32) {
 }
 
 func (s *app) miniView(c *ui.Context) {
+	s.miniContent(c, s.showMain)
+}
+
+func (s *app) showMain() {
+	if s.win != nil {
+		if s.win.IsMinimized() {
+			s.win.Restore()
+		}
+		s.win.Show()
+		s.win.Focus()
+	}
+}
+
+func miniButton(c *ui.Context, key, icon, label string, size float32) ui.Element {
+	button := ui.Button(c.Key(key), "").Label(label).Size(size, size).Padding(0).Radius(size/2).Border(0, ui.Transparent).Background(ui.Transparent)
+	color := muted
+	if button.Hovered() {
+		button.Background(ui.Hex("#ecfdf5"))
+		color = accent
+	}
+	button.Transition(ui.ElementTransition{Colors: true, Duration: 160 * time.Millisecond})
+	buttonMotion(button, 1.14, 0)
+	button.Children(func() { glyph(c, icon, 14, color) })
+	return button
+}
+
+func (s *app) miniContent(c *ui.Context, restore func()) {
 	initAssets()
 	theme := ui.LightTheme()
 	theme.FontSize = 12
@@ -28,9 +56,18 @@ func (s *app) miniView(c *ui.Context) {
 		s.miniVolumeOpen = false
 	}
 	root.Children(func() {
-		ui.Row(c).Fill().Padding(5).Gap(8).AlignItems(ui.Center).Children(func() {
-			ui.Box(c).Size(38, 38).Radius(3).Clip().DragWindow().Children(func() { s.coverView(c, 38) })
-			caption := ui.Column(c.Key("caption")).Grow(1).Gap(1).Clip().DragWindow()
+		// Keep the drag/click surface separate from the controls so their
+		// clicks cannot also open the main window.
+		ui.Box(c.Key("mini-surface")).Absolute().Fill().Label("打开主窗口").Role(ui.RoleButton).HandleInput(s.miniSurfaceInput).OnClick(func() {
+			moved := s.miniDrag.moved
+			s.miniDrag.moved = false
+			if !moved {
+				restore()
+			}
+		})
+		ui.Row(c).Fill().Padding(5).Gap(8).AlignItems(ui.Center).PassThrough().Children(func() {
+			ui.Box(c).Size(38, 38).Radius(3).Clip().Children(func() { s.coverView(c, 38) })
+			caption := ui.Column(c.Key("caption")).Grow(1).Gap(1).Clip()
 			fade := float32(0)
 			if hovered {
 				fade = 1
@@ -51,28 +88,22 @@ func (s *app) miniView(c *ui.Context) {
 				}
 			})
 		})
-		controls := ui.Row(c.Key("mini-controls")).Absolute().Left(49).Right(3).Top(5).Bottom(5).Background(white.Alpha(.98)).Gap(2).AlignItems(ui.Center).Justify(ui.Center)
+		controls := ui.Row(c.Key("mini-controls")).Absolute().Left(49).Right(3).Top(5).Bottom(5).Background(white.Alpha(.98)).Gap(6).AlignItems(ui.Center).Justify(ui.Center)
 		fade := float32(1)
 		if hovered {
 			fade = 0
 		}
 		controls.AnimatePose(ui.Pose{Fade: fade}, hoverAnimation).IgnoreInput(!hovered)
 		controls.Children(func() {
-			iconButton(c, "prev", "prev", "上一首", 26).OnClick(func() { s.step(-1) })
+			miniButton(c, "prev", "prev", "上一首", 28).OnClick(func() { s.step(-1) })
 			icon := "play"
 			if s.playing {
 				icon = "pause"
 			}
-			iconButton(c, "toggle", icon, "播放或暂停", 26).OnClick(s.toggle)
-			iconButton(c, "next", "next", "下一首", 26).OnClick(func() { s.step(1) })
-			iconButton(c, "volume", "volume", "调节音量", 26).OnClick(func() { s.miniVolumeOpen = !s.miniVolumeOpen })
-			iconButton(c, "restore", "mini", "打开主窗口", 24).OnClick(func() {
-				if s.win != nil {
-					s.win.Show()
-					s.win.Focus()
-				}
-			})
-			iconButton(c, "hide", "close", "隐藏悬浮窗", 22).OnClick(func() {
+			miniButton(c, "toggle", icon, "播放或暂停", 28).OnClick(s.toggle)
+			miniButton(c, "next", "next", "下一首", 28).OnClick(func() { s.step(1) })
+			miniButton(c, "volume", "volume", "调节音量", 28).OnClick(func() { s.miniVolumeOpen = !s.miniVolumeOpen })
+			miniButton(c, "hide", "close", "隐藏悬浮窗", 24).OnClick(func() {
 				if s.mini != nil {
 					s.mini.Hide()
 				}
@@ -88,6 +119,47 @@ func (s *app) miniView(c *ui.Context) {
 			})
 		}
 	})
+}
+
+type miniDragState struct {
+	pressed, moved   bool
+	x, y             float32
+	windowX, windowY int
+}
+
+func (s *app) miniSurfaceInput(ev ui.InputEvent) bool {
+	if ev.Button != 0 {
+		return false
+	}
+	switch ev.Kind {
+	case ui.InputPointerDown:
+		s.miniDrag = miniDragState{pressed: true, x: ev.X, y: ev.Y}
+		if s.mini != nil {
+			s.miniDrag.windowX, s.miniDrag.windowY = s.mini.Position()
+		}
+		return true
+	case ui.InputPointerMove:
+		if !s.miniDrag.pressed {
+			return false
+		}
+		x, y := s.miniDrag.windowX, s.miniDrag.windowY
+		if s.mini != nil {
+			x, y = s.mini.Position()
+		}
+		dx := float32(x-s.miniDrag.windowX) + ev.X - s.miniDrag.x
+		dy := float32(y-s.miniDrag.windowY) + ev.Y - s.miniDrag.y
+		if math.Hypot(float64(dx), float64(dy)) > 4 {
+			s.miniDrag.moved = true
+		}
+		if s.miniDrag.moved && s.mini != nil {
+			s.mini.SetPosition(s.miniDrag.windowX+int(math.Round(float64(dx))), s.miniDrag.windowY+int(math.Round(float64(dy))))
+		}
+		return true
+	case ui.InputPointerUp:
+		s.miniDrag.pressed = false
+		return true
+	}
+	return false
 }
 func scrollingCaption(c *ui.Context, text, font string, size float32, color ui.Color, elapsed time.Duration, playing bool) {
 	frameAt := c.Now()

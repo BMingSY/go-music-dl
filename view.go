@@ -327,7 +327,7 @@ func (s *app) trackCard(c *ui.Context, t library.Track, i int, tracks []library.
 			})
 			ui.Row(c).Gap(6).Children(func() {
 				for n, tag := range []string{t.Source, t.FormatDuration(), t.FormatSize(), t.FormatBitrate()} {
-					if tag != "" {
+					if tag != "" && tag != "-" && (n != 1 || t.Duration > 0) && (n != 2 || t.Size > 0) && (n != 3 || t.Bitrate > 0) {
 						bg, fg := ui.Hex("#edf2f7"), muted
 						if n == 0 {
 							tag = strings.ToUpper(tag)
