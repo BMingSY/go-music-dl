@@ -15,8 +15,8 @@ from fontTools.ttLib import TTFont
 
 
 root = Path(__file__).resolve().parent.parent
-assets = root / "assets"
-codepoints = {int(x, 16) for x in re.findall(r"\\u([0-9a-fA-F]{4})", (root / "assets.go").read_text())}
+assets = root / "internal" / "assets"
+codepoints = {int(x, 16) for x in re.findall(r"\\u([0-9a-fA-F]{4})", (root / "internal" / "desktop" / "assets.go").read_text())}
 sources = [
     ("fa-solid-900.ttf", "af19d135d3a935b3ebfbd80320716ffe1202052c5f68dc2c5f1abc57005ac605", "musicdl-icons.ttf", "MusicDL Icons"),
     ("fa-regular-400.ttf", "557e6966ad8dba7352ac6d350c1546b685b13d68db26f09cba45cadd660d45db", "musicdl-outline.ttf", "MusicDL Outline"),
