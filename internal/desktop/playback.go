@@ -58,6 +58,9 @@ func (s *app) playFrom(index int, tracks []library.Track, position time.Duration
 	s.playCancel = cancel
 	cfg := s.cfg
 	go func() {
+		if ctx.Err() != nil {
+			return
+		}
 		ffmpeg, err := playback.FindFFmpeg(cfg.FFmpeg)
 		if err != nil {
 			s.playError(id, err)
@@ -105,28 +108,7 @@ func (s *app) playFrom(index int, tracks []library.Track, position time.Duration
 			p.SetVolume(s.cfg.Volume)
 			p.SetSpeed(s.speed)
 			p.OnEnd(func() {
-				s.update(func() {
-					if id != s.playID || s.player != p {
-						return
-					}
-					s.playing = false
-					if err := d.Err(); err != nil {
-						s.status = err.Error()
-						return
-					}
-					if s.cfg.PlayMode == "one" {
-						s.play(s.queueIndex, s.queue)
-					} else if s.cfg.PlayMode == "shuffle" && len(s.queue) > 0 {
-						s.play(rand.IntN(len(s.queue)), s.queue)
-					} else if s.queueIndex+1 < len(s.queue) {
-						s.play(s.queueIndex+1, s.queue)
-					} else if s.cfg.PlayMode == "loop" {
-						s.play(0, s.queue)
-					} else {
-						s.status = "播放完毕"
-						s.syncMedia()
-					}
-				})
+				s.update(func() { s.playbackEnded(id, p, d) })
 			})
 			p.Play()
 			s.playing = true
@@ -157,6 +139,32 @@ func (s *app) playFrom(index int, tracks []library.Track, position time.Duration
 	}()
 }
 
+func (s *app) playbackEnded(id uint64, p *audio.Player, d *playback.Decoder) {
+	if id != s.playID || s.player != p || p.Playing() {
+		return
+	}
+	s.playing = false
+	if err := d.Err(); err != nil {
+		s.position = p.Position()
+		s.status = err.Error()
+		_ = s.savePlayback()
+		s.syncMedia()
+		return
+	}
+	if s.cfg.PlayMode == "one" {
+		s.play(s.queueIndex, s.queue)
+	} else if s.cfg.PlayMode == "shuffle" && len(s.queue) > 0 {
+		s.play(rand.IntN(len(s.queue)), s.queue)
+	} else if s.queueIndex+1 < len(s.queue) {
+		s.play(s.queueIndex+1, s.queue)
+	} else if s.cfg.PlayMode == "loop" {
+		s.play(0, s.queue)
+	} else {
+		s.status = "播放完毕"
+		s.syncMedia()
+	}
+}
+
 func (s *app) playError(id uint64, err error) {
 	s.update(func() {
 		if id == s.playID {
@@ -181,6 +189,7 @@ func (s *app) stop() {
 		s.decoder = nil
 	}
 	s.playing = false
+	s.playbackPausedAt = time.Time{}
 }
 
 func (s *app) toggle() {
@@ -192,8 +201,19 @@ func (s *app) toggle() {
 	}
 	if s.player.Playing() {
 		s.player.Pause()
+		s.playbackPausedAt = time.Now()
 	} else {
+		// A paused network decoder can outlive its connection or signed URL.
+		// Re-resolve it after a long pause, or after any decoding failure,
+		// and resume the same song instead of replaying a stale stream.
+		failed := s.decoder != nil && s.decoder.Err() != nil
+		stale := s.current != nil && s.current.Source != "local" && !s.playbackPausedAt.IsZero() && time.Since(s.playbackPausedAt) >= time.Minute
+		if failed || stale {
+			s.playFrom(s.queueIndex, s.queue, s.player.Position())
+			return
+		}
 		s.player.Play()
+		s.playbackPausedAt = time.Time{}
 	}
 	s.playing = s.player.Playing()
 	_ = s.savePlayback()

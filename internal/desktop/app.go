@@ -17,6 +17,7 @@ import (
 type app struct {
 	miniDrag                                                          miniDragState
 	playbackSaved                                                     time.Time
+	playbackPausedAt                                                  time.Time
 	utilityPage                                                       int
 	downloadTab, downloadFilter                                       string
 	toastSeen                                                         string

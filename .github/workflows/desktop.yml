@@ -1,208 +1,150 @@
-name: Desktop
+name: CI
+
 on:
   pull_request:
     branches: [custom]
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [custom]
-    tags: ['native-v*']
   workflow_dispatch:
-    inputs:
-      native_arm:
-        description: Run additional native tests on Apple Silicon
-        type: boolean
-        default: false
+
 permissions:
   contents: read
+
 concurrency:
-  group: desktop-${{ github.ref }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
+
 jobs:
-  media:
-    name: Media (${{ matrix.target }})
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: ubuntu-latest
-            target: windows-amd64
-          - runner: macos-15-intel
-            target: darwin-amd64
-          - runner: macos-15-intel
-            target: darwin-arm64
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 40
+  workflows:
+    name: Workflow lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Install compiler dependencies
-        shell: bash
+      - name: Validate GitHub Actions workflows
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
+      - name: Check Go formatting
         run: |
-          if [[ "$RUNNER_OS" == Linux ]]; then
-            sudo apt-get update -qq
-            sudo apt-get install -y gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 cmake ninja-build meson pkg-config
-          else
-            brew install cmake ninja meson pkg-config || brew upgrade cmake ninja meson pkg-config
+          unformatted=$(gofmt -l cmd internal tools)
+          if [[ -n "$unformatted" ]]; then
+            printf '%s\n' "$unformatted"
+            exit 1
           fi
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/music-dl/media
-            ~/Library/Caches/music-dl/media
-          key: media-${{ matrix.target }}-${{ hashFiles('tools/bundle-ffmpeg/main.go') }}
-      - name: Build media tools
-        run: go run ./tools/bundle-ffmpeg -platform '${{ matrix.target }}'
-      - uses: actions/upload-artifact@v4
-        with:
-          name: media-${{ matrix.target }}
-          path: resources/${{ matrix.target }}/
-          retention-days: 14
-  build:
-    needs: media
-    name: Desktop (${{ matrix.target }})
+
+  test:
+    name: Test (${{ matrix.target }})
     strategy:
       fail-fast: false
       matrix:
         include:
           - runner: windows-latest
             target: windows-amd64
-            platform: windows/amd64
-          - runner: macos-15-intel
-            target: darwin-arm64
-            platform: darwin/arm64
           - runner: macos-15-intel
             target: darwin-amd64
-            platform: darwin/amd64
+          - runner: macos-15
+            target: darwin-arm64
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 35
+    timeout-minutes: 20
     defaults:
       run:
         shell: bash
+    env:
+      MUSIC_DL_REQUIRE_AUDIO_TESTS: '1'
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - uses: actions/download-artifact@v4
+      - name: Install FFmpeg on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
+            choco install ffmpeg --yes --no-progress --limit-output
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: Cache macOS FFmpeg
+        if: runner.os == 'macOS'
+        id: macos-media
+        uses: actions/cache@v4
         with:
-          pattern: media-*
-          path: media-artifacts
-      - name: Bundle audio tools
-        run: |
-          for target in windows-amd64 darwin-amd64 darwin-arm64; do
-            mkdir -p "resources/$target"
-            cp -R "media-artifacts/media-$target/." "resources/$target/"
-            chmod +x "resources/$target/ffmpeg" "resources/$target/ffprobe" 2>/dev/null || true
-          done
-          host_target="$(go env GOOS)-$(go env GOARCH)"
-          python3 -c 'import os,sys; print(os.path.abspath("resources/"+sys.argv[1]))' "$host_target" >> "$GITHUB_PATH"
-          printf 'MUSIC_DL_TEST_FFMPEG=%s\n' "$(python3 -c 'import os,sys; print(os.path.abspath("resources/"+sys.argv[1]+"/ffmpeg"+(".exe" if os.name=="nt" else "")))' "$host_target")" >> "$GITHUB_ENV"
-      - name: Verify
+          path: resources/${{ matrix.target }}/
+          key: ci-media-${{ matrix.target }}-${{ hashFiles('tools/bundle-ffmpeg/main.go') }}
+      - name: Build FFmpeg on macOS
+        if: runner.os == 'macOS' && steps.macos-media.outputs.cache-hit != 'true'
         env:
-          MUSIC_DL_REQUIRE_AUDIO_TESTS: '1'
+          MEDIA_TARGET: ${{ matrix.target }}
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
         run: |
-          go vet ./...
-          go test -race -timeout=180s ./...
-          go run ./tools/test-update
-      - name: Build desktop package
+          brew install cmake ninja meson pkg-config
+          go run ./tools/bundle-ffmpeg -platform "$MEDIA_TARGET"
+      - name: Use bundled FFmpeg on macOS
+        if: runner.os == 'macOS'
         env:
-          CGO_ENABLED: '0'
-          MYGO_UPDATER_PRIVATE_KEY: ${{ startsWith(github.ref, 'refs/tags/native-v') && secrets.MYGO_UPDATER_PRIVATE_KEY || '' }}
+          MEDIA_TARGET: ${{ matrix.target }}
+        run: printf '%s\n' "$PWD/resources/$MEDIA_TARGET" >> "$GITHUB_PATH"
+      - name: Verify native architecture and media tools
+        env:
+          EXPECTED_TARGET: ${{ matrix.target }}
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/native-v* ]]; then
-            test -n "$MYGO_UPDATER_PRIVATE_KEY"
-            python3 -c 'import json,os; c=json.load(open("mygo.json")); assert c["updates"]["tagPrefix"]+c["version"] == os.environ["GITHUB_REF_NAME"], "Tag must match mygo.json version"'
-          fi
-          go run github.com/egoist/mygo/cmd/mygo@v0.7.4 build -platform '${{ matrix.platform }}'
-      - name: Check package size
-        run: |
+          test "$(go env GOOS)-$(go env GOARCH)" = "$EXPECTED_TARGET"
           python3 - <<'PY'
-          from pathlib import Path
-          target = '${{ matrix.target }}'
-          pattern = '**/music-dl-setup-*.exe' if target.startswith('windows-') else '**/*.dmg'
-          files = list(Path('dist').glob(pattern))
-          assert len(files) == 1, files
-          size = files[0].stat().st_size
-          limit = (8 if target.startswith('windows-') else 9) * 1024 * 1024
-          assert size <= limit, f'{files[0]}: {size / 1048576:.2f} MiB exceeds the package budget'
-          print(f'{files[0]}: {size / 1048576:.2f} MiB')
+          import os
+          import shutil
+          import subprocess
+          for name in ('ffmpeg', 'ffprobe'):
+              path = shutil.which(name)
+              if path is None:
+                  raise SystemExit(f'{name} is required for CI')
+              subprocess.run([path, '-version'], check=True)
+              if name == 'ffmpeg':
+                  for option, required in (('-filters', 'subtitles'),
+                                           ('-encoders', 'h264_mf' if os.name == 'nt' else 'h264_videotoolbox')):
+                      result = subprocess.run([path, '-hide_banner', option], check=True,
+                                              capture_output=True, text=True)
+                      available = {fields[1] for line in result.stdout.splitlines()
+                                   if len(fields := line.split()) >= 2}
+                      if required not in available:
+                          raise SystemExit(f'FFmpeg {required} support is required for CI')
+                  with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as env:
+                      env.write(f'MUSIC_DL_TEST_FFMPEG={path}\n')
           PY
-      - name: Render UI and run native window smoke
+      - name: Go vet
+        run: go vet ./...
+      - name: Race tests with FFmpeg
+        run: go test -race -count=1 -timeout=180s ./...
+      - name: Update installation smoke
+        run: go run ./tools/test-update
+      - name: Render desktop UI
         env:
-          MUSIC_DL_PREVIEW_DIR: artifacts/render
+          MUSIC_DL_PREVIEW_DIR: ${{ github.workspace }}/artifacts/render
         run: |
           go test -run TestRenderPreview -count=1 ./internal/desktop
+          test -s artifacts/render/main.png
+          test -s artifacts/render/mini.png
+      - name: Native window smoke
+        run: |
           mkdir -p artifacts/smoke
-          if [[ "$RUNNER_OS" == macOS && '${{ matrix.target }}' == "$(go env GOOS)-$(go env GOARCH)" ]]; then
-            app_binary=$(find dist -path '*.app/Contents/MacOS/*' -type f | head -1)
-            "$app_binary" --smoke-test "$PWD/artifacts/smoke"
-            test -f artifacts/smoke/result.txt
+          binary="$PWD/artifacts/music-dl"
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            binary+='.exe'
           fi
+          go build -o "$binary" ./cmd/music-dl
+          "$binary" --smoke-test "$PWD/artifacts/smoke"
+          test -s artifacts/smoke/result.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: music-dl-${{ matrix.target }}
-          path: |
-            dist/
-            artifacts/
-          retention-days: 14
-  native-arm:
-    if: github.event_name == 'workflow_dispatch' && inputs.native_arm
-    needs: media
-    name: Native tests on Apple Silicon
-    runs-on: macos-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-      - uses: actions/download-artifact@v4
-        with:
-          name: media-darwin-arm64
-          path: resources/darwin-arm64
-      - name: Verify native Apple Silicon package
-        env:
-          MUSIC_DL_REQUIRE_AUDIO_TESTS: '1'
-          MUSIC_DL_TEST_FFMPEG: ${{ github.workspace }}/resources/darwin-arm64/ffmpeg
-        run: |
-          chmod +x resources/darwin-arm64/ffmpeg resources/darwin-arm64/ffprobe
-          go vet ./...
-          go test -race -timeout=180s ./...
-          go run ./tools/test-update
-          go run github.com/egoist/mygo/cmd/mygo@v0.7.4 build -platform darwin/arm64
-          app_binary=$(find dist -path '*.app/Contents/MacOS/*' -type f | head -1)
-          "$app_binary" --smoke-test "$PWD/artifacts/smoke"
-          test -f artifacts/smoke/result.txt
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: native-arm-smoke
+          name: ci-${{ matrix.target }}
           path: artifacts/
-          retention-days: 14
-  release:
-    if: startsWith(github.ref, 'refs/tags/native-v')
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-      - uses: actions/download-artifact@v4
-        with:
-          path: packages
-          pattern: music-dl-*
-      - name: Publish release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          go run ./tools/verify-release packages release-assets
-          release_version="${GITHUB_REF_NAME#native-v}"
-          awk -v ver="$release_version" '/^## / {if(found) exit; if($2==ver) {found=1; next}} found' CHANGELOG.md > release-notes.md
-          test -s release-notes.md
-          gh release create "$GITHUB_REF_NAME" release-assets/* --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "music-dl $release_version" --notes-file release-notes.md
-          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          if-no-files-found: warn
+          retention-days: 7
