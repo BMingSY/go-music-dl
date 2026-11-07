@@ -126,23 +126,29 @@ func slimSlider(c *ui.Context, label string, value *float64, hi float64) ui.Elem
 	})
 }
 
+const queueRowHeight = 33
+const queueVisibleRows = 7
+
 func (s *app) queueView(c *ui.Context) {
+	if s.queueReveal {
+		index := max(0, s.currentQueueIndex())
+		s.queueScroll.Y = float32(max(0, min(index-queueVisibleRows/2, len(s.queue)-queueVisibleRows)) * queueRowHeight)
+		s.queueReveal = false
+	}
 	ui.Column(c).Width(400).Background(white).Border(1, ui.Hex("#eeeeee")).Margin(0, 0, 34, 0).Children(func() {
 		ui.Row(c).Padding(8, 12).Gap(8).Background(ui.Hex("#f8fafc")).AlignItems(ui.Center).Children(func() {
 			ui.Text(c, fmt.Sprintf("播放队列 · %d 首", len(s.queue))).FontSize(12).TextColor(muted).Grow(1)
+			iconButton(c, "locate-current", "target", "定位当前歌曲", 28).Radius(6).Background(white).Border(1, border).Disabled(s.currentQueueIndex() < 0).OnClick(func() { s.queueReveal = true })
 			ui.Button(c, "清空队列").FontSize(11).OnClick(func() { s.queue = nil; s.queueIndex = -1; s.queueOpen = false })
 		})
-		ui.Scroll(c.Key("player-queue-scroll")).Label("播放队列列表").Height(min(220, float32(len(s.queue)*33))).TrackScroll(&s.queueScroll).Children(func() {
+		ui.Scroll(c.Key("player-queue-scroll")).Label("播放队列列表").Height(float32(min(queueVisibleRows, len(s.queue)) * queueRowHeight)).TrackScroll(&s.queueScroll).Children(func() {
 			ui.Column(c).Children(func() {
 				for index, track := range s.queue {
 					bg := white
 					if s.current != nil && s.current.Key() == track.Key() {
 						bg = ui.Hex("#e9e9e9")
 					}
-					row := ui.Row(c.Key(track.Key())).Label("队列歌曲 "+track.Name).Height(33).Gap(8).Padding(0, 8, 0, 12).Background(bg).AlignItems(ui.Center).OnClick(func() { s.play(index, s.queue) })
-					if s.queueReveal && s.current != nil && s.current.Key() == track.Key() {
-						row.ScrollIntoView()
-					}
+					row := ui.Row(c.Key(track.Key())).Label("队列歌曲 "+track.Name).Height(queueRowHeight).Gap(8).Padding(0, 8, 0, 12).Background(bg).AlignItems(ui.Center).OnClick(func() { s.play(index, s.queue) })
 					row.Children(func() {
 						ui.Text(c, fmt.Sprint(index+1)).FontSize(12).TextColor(muted)
 						ui.Text(c, track.Name).FontSize(12).Grow(1).SingleLine().Ellipsis("…")
@@ -158,5 +164,4 @@ func (s *app) queueView(c *ui.Context) {
 			})
 		})
 	})
-	s.queueReveal = false
 }

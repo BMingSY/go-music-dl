@@ -117,7 +117,7 @@ func settingToggle(c *ui.Context, value *bool, title, hint string) bool {
 }
 
 func (s *app) generalSettings(c *ui.Context) {
-	if settingToggle(c, &s.cfg.FloatingLyrics, "播放音乐时显示悬浮歌词", "关闭后，播放音乐时不自动显示悬浮窗。") && s.mini != nil {
+	if settingToggle(c, &s.cfg.FloatingLyrics, "播放音乐时显示悬浮窗", "关闭后，播放音乐时不自动显示悬浮窗。") && s.mini != nil {
 		if s.cfg.FloatingLyrics && s.playing {
 			s.mini.Show()
 		} else {
@@ -125,7 +125,7 @@ func (s *app) generalSettings(c *ui.Context) {
 		}
 	}
 	settingsPanel(c, func() {
-		sectionHeading(c, "font", "歌词字体", "同时应用到播放器歌词和悬浮歌词")
+		sectionHeading(c, "font", "歌词字体", "同时应用到播放器和悬浮窗的歌词")
 		ui.Row(c).Gap(12).Margin(13, 0, 0, 0).Children(func() {
 			ui.Column(c).Grow(1.2).Gap(4).Children(func() {
 				ui.Text(c, "字体").FontSize(12).FontWeight(600).TextColor(muted)

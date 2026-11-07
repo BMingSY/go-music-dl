@@ -91,6 +91,42 @@ func TestQueueOpensAtCurrentTrackAndModesStayInSync(t *testing.T) {
 			t.Fatal("mode change still leaves a floating text status")
 		}
 	}
+	for _, test := range []struct{ index, slot int }{{0, 0}, {1, 1}, {3, 3}, {27, 3}, {300, 3}, {460, 3}, {461, 4}, {463, 6}} {
+		if s.queueOpen {
+			if err := tt.Click("播放队列"); err != nil {
+				t.Fatal(err)
+			}
+		}
+		s.queueIndex = test.index
+		s.current = &s.queue[test.index]
+		tt.Frame()
+		if err := tt.Click("播放队列"); err != nil {
+			t.Fatal(err)
+		}
+		tt.Advance(time.Second)
+		viewport, _ := tt.Find("播放队列列表")
+		row, ok := tt.Find("队列歌曲 " + s.current.Name)
+		want := viewport.Y + float32(test.slot*33)
+		if !ok || row.H <= 0 || row.Y < want-1 || row.Y > want+1 {
+			t.Fatalf("index %d: current row at %.1f, want %.1f (visible row %d)", test.index, row.Y, want, test.slot+1)
+		}
+	}
+	s.queueIndex = 300
+	s.current = &s.queue[300]
+	tt.Frame()
+	viewport, _ = tt.Find("播放队列列表")
+	tt.Scroll(viewport.X+viewport.W/2, viewport.Y+viewport.H/2, 0, -100000)
+	tt.Advance(time.Second)
+	if err := tt.Click("定位当前歌曲"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Advance(time.Second)
+	viewport, _ = tt.Find("播放队列列表")
+	row, ok = tt.Find("队列歌曲 歌曲 300")
+	want := viewport.Y + 3*33
+	if !ok || row.H <= 0 || row.Y < want-1 || row.Y > want+1 || !s.queueOpen || s.player != nil {
+		t.Fatal("locate-current button did not return to row four without changing playback")
+	}
 }
 
 func TestLyricsExtraActionsAreCollapsed(t *testing.T) {

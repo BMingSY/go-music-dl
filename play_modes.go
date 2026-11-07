@@ -35,3 +35,18 @@ func (s *app) toggleQueue() {
 	}
 	s.queueReveal = true
 }
+
+func (s *app) currentQueueIndex() int {
+	if s.current == nil {
+		return -1
+	}
+	if s.queueIndex >= 0 && s.queueIndex < len(s.queue) && s.queue[s.queueIndex].Key() == s.current.Key() {
+		return s.queueIndex
+	}
+	for i, track := range s.queue {
+		if track.Key() == s.current.Key() {
+			return i
+		}
+	}
+	return -1
+}

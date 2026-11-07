@@ -113,7 +113,6 @@ func (s *app) miniContent(c *ui.Context, restore func()) {
 				if slimSlider(c, "悬浮窗音量", &v, 1).Grow(1).HandleInput(miniControlInput).Changed() {
 					s.volume(v)
 				}
-				ui.Button(c, "完成").FontSize(10).Padding(0).Height(15).HandleInput(miniControlInput).OnClick(func() { s.miniVolumeOpen = false })
 			})
 		}
 	})

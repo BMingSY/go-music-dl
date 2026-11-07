@@ -36,6 +36,14 @@ func TestMiniCoverBlankControlsAndDrag(t *testing.T) {
 		if restored != 5 {
 			t.Fatalf("%s also opened the main window", label)
 		}
+		if label == "调节音量" {
+			if _, ok := tt.Find("悬浮窗音量"); !ok {
+				t.Fatal("volume slider did not open")
+			}
+			if _, ok := tt.Find("完成"); ok {
+				t.Fatal("volume slider still has a Done button")
+			}
+		}
 	}
 	for _, point := range []ui.Point{{X: 20, Y: 25}, {X: 130, Y: 2}, {X: 48, Y: 25}, {X: 126, Y: 25}, {X: 130, Y: 48}} {
 		tt.Press(point.X, point.Y)
@@ -115,5 +123,11 @@ func TestDesktopBrowseEntries(t *testing.T) {
 		if _, ok := tt.Find(label); !ok {
 			t.Fatalf("remaining entry %q is missing", label)
 		}
+	}
+	if err := tt.Click("系统设置"); err != nil {
+		t.Fatal(err)
+	}
+	if !tt.HasText("播放音乐时显示悬浮窗") || tt.HasText("悬浮歌词") {
+		t.Fatal("floating-window setting still uses the old lyrics name")
 	}
 }
