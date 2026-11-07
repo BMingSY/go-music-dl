@@ -99,6 +99,7 @@ type app struct {
 	searchID, playID            uint64
 	playCancel                  context.CancelFunc
 	updateBusy                  bool
+	pendingUpdate               *mygo.Update
 	updateStatus                string
 	updateProgress              float64
 }
@@ -525,6 +526,7 @@ func (s *app) checkUpdate() {
 		return
 	}
 	s.updateBusy = true
+	s.pendingUpdate = nil
 	s.updateProgress = 0
 	s.updateStatus = "正在检查更新…"
 	go func() {
@@ -534,16 +536,33 @@ func (s *app) checkUpdate() {
 			s.update(func() { s.updateBusy = false; s.updateStatus = updateCheckMessage(err) })
 			return
 		}
-		if up == nil {
-			s.update(func() { s.updateBusy = false; s.updateStatus = updateCheckMessage(nil) })
-			return
-		}
-		res, err := mygo.Dialog.Message(mygo.MessageOptions{Parent: s.win, Message: "发现新版本 " + up.Version, Detail: "下载完成后将自动重启更新。", Buttons: []string{"下载并重启", "稍后"}})
-		if err != nil || res.Button != 0 {
-			s.update(func() { s.updateBusy = false; s.updateStatus = "发现新版本 " + up.Version })
-			return
-		}
-		err = up.Install(s.ctx, func(n, total int64) {
+		s.update(func() { s.offerUpdate(up) })
+	}()
+}
+
+func (s *app) offerUpdate(up *mygo.Update) {
+	s.updateBusy = false
+	s.pendingUpdate = up
+	if up == nil {
+		s.updateStatus = updateCheckMessage(nil)
+		return
+	}
+	s.updateStatus = "发现新版本 " + up.Version
+	if s.modal == "about" {
+		s.modal = "update"
+	}
+}
+
+func (s *app) installUpdate() {
+	if s.pendingUpdate == nil || s.updateBusy {
+		return
+	}
+	up := s.pendingUpdate
+	s.updateBusy = true
+	s.updateProgress = 0
+	s.updateStatus = "正在下载更新…"
+	go func() {
+		err := up.Install(s.ctx, func(n, total int64) {
 			s.update(func() {
 				if total > 0 {
 					s.updateProgress = float64(n) / float64(total)
