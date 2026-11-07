@@ -3,11 +3,6 @@ on:
   push:
     tags: ['native-v*']
   workflow_dispatch:
-    inputs:
-      native_arm:
-        description: Run additional native tests on Apple Silicon
-        type: boolean
-        default: false
 permissions:
   contents: read
 concurrency:
@@ -22,9 +17,7 @@ jobs:
         include:
           - runner: ubuntu-latest
             target: windows-amd64
-          - runner: macos-15-intel
-            target: darwin-amd64
-          - runner: macos-15-intel
+          - runner: macos-15
             target: darwin-arm64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
@@ -65,12 +58,9 @@ jobs:
           - runner: windows-latest
             target: windows-amd64
             platform: windows/amd64
-          - runner: macos-15-intel
+          - runner: macos-15
             target: darwin-arm64
             platform: darwin/arm64
-          - runner: macos-15-intel
-            target: darwin-amd64
-            platform: darwin/amd64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 35
     defaults:
@@ -87,7 +77,7 @@ jobs:
           path: media-artifacts
       - name: Bundle audio tools
         run: |
-          for target in windows-amd64 darwin-amd64 darwin-arm64; do
+          for target in windows-amd64 darwin-arm64; do
             mkdir -p "resources/$target"
             cp -R "media-artifacts/media-$target/." "resources/$target/"
             chmod +x "resources/$target/ffmpeg" "resources/$target/ffprobe" 2>/dev/null || true
@@ -146,40 +136,6 @@ jobs:
           path: |
             dist/
             artifacts/
-          retention-days: 14
-  native-arm:
-    if: github.event_name == 'workflow_dispatch' && inputs.native_arm
-    needs: media
-    name: Native tests on Apple Silicon
-    runs-on: macos-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-      - uses: actions/download-artifact@v4
-        with:
-          name: media-darwin-arm64
-          path: resources/darwin-arm64
-      - name: Verify native Apple Silicon package
-        env:
-          MUSIC_DL_REQUIRE_AUDIO_TESTS: '1'
-          MUSIC_DL_TEST_FFMPEG: ${{ github.workspace }}/resources/darwin-arm64/ffmpeg
-        run: |
-          chmod +x resources/darwin-arm64/ffmpeg resources/darwin-arm64/ffprobe
-          go vet ./...
-          go test -race -timeout=180s ./...
-          go run ./tools/test-update
-          go run github.com/egoist/mygo/cmd/mygo@v0.7.4 build -platform darwin/arm64
-          app_binary=$(find dist -path '*.app/Contents/MacOS/*' -type f | head -1)
-          "$app_binary" --smoke-test "$PWD/artifacts/smoke"
-          test -f artifacts/smoke/result.txt
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: native-arm-smoke
-          path: artifacts/
           retention-days: 14
   release:
     if: startsWith(github.ref, 'refs/tags/native-v')
