@@ -84,7 +84,7 @@ jobs:
       - name: Use bundled FFmpeg
         env:
           MEDIA_TARGET: ${{ matrix.target }}
-        run: printf '%s\n' "$PWD/resources/$MEDIA_TARGET" >> "$GITHUB_PATH"
+        run: python3 -c 'import os; print(os.path.abspath("resources/"+os.environ["MEDIA_TARGET"]))' >> "$GITHUB_PATH"
       - name: Verify native architecture and media tools
         env:
           EXPECTED_TARGET: ${{ matrix.target }}
