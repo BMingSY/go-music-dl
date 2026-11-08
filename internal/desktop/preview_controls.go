@@ -105,6 +105,8 @@ func (s *app) replacePreviewCover() {
 		}
 		s.cover = bitmap
 		s.previewCover = append([]byte(nil), b...)
+		s.syncNowPlayingMetadata()
+		s.syncMedia()
 		s.status = ""
 	})
 }
