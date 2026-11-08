@@ -10,7 +10,6 @@
     "ffmpeg.exe": "dcd7f2e21b2c94c4acd2c7e01822f6c52ddba744e1173f9774c9cadb62cec154",
     "ffprobe.exe": "33a3c0a5a4674d093390f93db45bf621d292c796fd98e0e42b8f778637badbc3",
     "libwinpthread-1.dll": "db1a0fc43ab2f0f8d9c87712567f79601b5f868b9bed514d3335f9016de692ec",
-    "licenses/MinGW-winpthreads.txt": "1c8d23063c3772b9435831410b31b51fef3d9cf2138a442dc367ef5d72239f67",
     "licenses/ffmpeg-LICENSE.txt": "246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30",
     "licenses/freetype-LICENSE.txt": "08c135755dd589039470f1fdbb400daaabaaa50d0b366d19cebff4d22986baa1",
     "licenses/freetype-NOTICE.txt": "2e3bbb7d7c5c396368dd0853a790ec29ce5b8647163dde42a0493fb0d6556b2b",
