@@ -1,8 +1,7 @@
-name: Desktop packages
+name: Release
 on:
   push:
     tags: ['native-v*']
-  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
@@ -88,7 +87,7 @@ jobs:
           MUSIC_DL_REQUIRE_AUDIO_TESTS: '1'
         run: |
           go vet ./...
-          go test -race -timeout=180s ./...
+          go test -race -count=1 -timeout=180s ./...
           go run ./tools/test-update
       - name: Build desktop package
         env:
@@ -122,11 +121,16 @@ jobs:
           test -s artifacts/render/main.png
           test -s artifacts/render/mini.png
           mkdir -p artifacts/smoke
-          if [[ "$RUNNER_OS" == macOS && "$SMOKE_TARGET" == "$(go env GOOS)-$(go env GOARCH)" ]]; then
+          test "$SMOKE_TARGET" = "$(go env GOOS)-$(go env GOARCH)"
+          if [[ "$RUNNER_OS" == macOS ]]; then
             app_binary=$(find dist -path '*.app/Contents/MacOS/*' -type f | head -1)
-            "$app_binary" --smoke-test "$PWD/artifacts/smoke"
-            test -f artifacts/smoke/result.txt
+          else
+            app_binary="$PWD/dist/$SMOKE_TARGET/music-dl.exe"
           fi
+          test -f "$app_binary"
+          "$app_binary" --smoke-test "$PWD/artifacts/smoke"
+          test -s artifacts/smoke/result.txt
+          test -s artifacts/smoke/settings.png
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -150,7 +154,7 @@ jobs:
         with:
           path: packages
           pattern: music-dl-*
-      - name: Create verified release draft
+      - name: Publish verified release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -158,4 +162,4 @@ jobs:
           release_version="${GITHUB_REF_NAME#native-v}"
           awk -v ver="$release_version" '/^## / {if(found) exit; if($2==ver) {found=1; next}} found' CHANGELOG.md > release-notes.md
           test -s release-notes.md
-          gh release create "$GITHUB_REF_NAME" release-assets/* --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "music-dl $release_version" --notes-file release-notes.md
+          gh release create "$GITHUB_REF_NAME" release-assets/* --repo "$GITHUB_REPOSITORY" --verify-tag --latest --title "music-dl $release_version" --notes-file release-notes.md
