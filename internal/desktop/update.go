@@ -64,17 +64,24 @@ func (s *app) installUpdate() {
 				s.updateStatus = fmt.Sprintf("正在下载更新 %.0f%%", s.updateProgress*100)
 			})
 		})
-		s.update(func() {
-			s.updateBusy = false
-			if err != nil {
-				log.Printf("installing update: %v", err)
-				s.updateStatus = "更新失败，请稍后重试。"
-				return
-			}
-			s.save()
-			mygo.App.Relaunch()
-		})
+		s.update(func() { s.finishUpdateInstall(err) })
 	}()
+}
+
+func (s *app) finishUpdateInstall(err error) {
+	s.updateBusy = false
+	if err != nil {
+		log.Printf("installing update: %v", err)
+		s.pendingUpdate = nil
+		s.updateProgress = 0
+		s.updateStatus = "更新失败，请重新检查更新。"
+		if s.modal == "update" {
+			s.modal = "about"
+		}
+		return
+	}
+	s.save()
+	mygo.App.Relaunch()
 }
 
 func updateCheckMessage(err error) string {

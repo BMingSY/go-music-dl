@@ -17,15 +17,16 @@ func (s *app) aboutView(c *ui.Context) {
 			})
 		}
 	})
-	if s.pendingUpdate != nil {
-		label := "下载更新"
-		if s.updateBusy {
-			label = "查看下载进度"
+	ui.Row(c).Gap(8).Children(func() {
+		if s.pendingUpdate != nil {
+			label := "下载更新"
+			if s.updateBusy {
+				label = "查看下载进度"
+			}
+			ui.Button(c, label).OnClick(func() { s.modal = "update" })
 		}
-		ui.Button(c, label).OnClick(func() { s.modal = "update" })
-	} else {
 		ui.Button(c, "检查更新").Disabled(s.updateBusy).OnClick(s.checkUpdate)
-	}
+	})
 	ui.Text(c, s.updateStatus).FontSize(13).TextColor(muted).MaxLines(5)
 	if s.updateBusy {
 		ui.Box(c).Height(5).Background(border).Radius(3).Children(func() { ui.Box(c).WidthPercent(float32(s.updateProgress * 100)).Height(5).Background(accent).Radius(3) })
