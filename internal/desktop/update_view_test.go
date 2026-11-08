@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -77,5 +78,51 @@ func TestUpdateCheckDoesNotReopenClosedModal(t *testing.T) {
 	s.offerUpdate(nil)
 	if s.pendingUpdate != nil || s.modal != "about" || s.updateStatus != "已经是最新版本" {
 		t.Fatal("an up-to-date result offered an installation")
+	}
+}
+
+func TestAboutCanCheckAgainWithAnExistingUpdateOffer(t *testing.T) {
+	s := newApp(context.Background(), library.Config{}, "")
+	s.modal = "about"
+	s.offerUpdate(&mygo.Update{Version: "0.1.4"})
+	s.closeModal()
+	tt := ui.NewTester(s.view, 1080, 740)
+	if _, ok := tt.Find("检查更新"); !ok {
+		t.Fatal("an existing update offer hides the check action")
+	}
+	if _, ok := tt.Find("下载更新"); !ok {
+		t.Fatal("the current offer cannot be reopened")
+	}
+}
+
+func TestFailedInstallDropsStaleOfferAndAllowsCheckingAgain(t *testing.T) {
+	for _, modal := range []string{"update", "about", ""} {
+		t.Run(modal, func(t *testing.T) {
+			s := newApp(context.Background(), library.Config{}, "")
+			s.pendingUpdate = &mygo.Update{Version: "0.1.4"}
+			s.modal, s.updateBusy, s.updateProgress = modal, true, .7
+			s.finishUpdateInstall(errors.New("fixture: withdrawn update"))
+			if s.pendingUpdate != nil || s.updateBusy || s.updateProgress != 0 {
+				t.Fatal("failed installation retained the withdrawn update")
+			}
+			if modal == "" {
+				if s.modal != "" {
+					t.Fatal("late installation failure reopened a closed modal")
+				}
+				s.modal = "about"
+			}
+			tt := ui.NewTester(s.view, 1080, 740)
+			if !tt.HasText("更新失败，请重新检查更新。") || tt.HasText("发现新版本 0.1.4") {
+				t.Fatal("failed offer is still presented as installable")
+			}
+			if _, ok := tt.Find("检查更新"); !ok {
+				t.Fatal("failed update cannot be checked again")
+			}
+			s.offerUpdate(&mygo.Update{Version: "0.1.6"})
+			tt.Frame()
+			if !tt.HasText("发现新版本 0.1.6") {
+				t.Fatal("a fresh check did not replace the withdrawn version")
+			}
+		})
 	}
 }
