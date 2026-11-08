@@ -35,6 +35,7 @@ func Run(options Options) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	s := newApp(ctx, cfg, path)
+	s.startup = mygo.App
 	mygo.App.SetName("music-dl")
 	mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) { s.save(); s.quitting = true; cancel() })
 	mygo.App.OnWillQuit(func(*mygo.QuitEvent) {
@@ -68,6 +69,7 @@ func Run(options Options) error {
 	}
 	if options.SmokeDir != "" {
 		message := "PASS: native windows, capture, tray lifecycle, close-to-hide\n"
+		message += "PASS: native settings and system startup status\n"
 		if options.SmokeAudio != "" {
 			message += "PASS: native audio output, playback, pause, seek, hidden-window playback\n"
 			message += "PASS: saved queue and position restore paused; pressing play resumes from the saved position\n"

@@ -75,6 +75,7 @@ type app struct {
 	configPath                  string
 	win, mini                   *mygo.Window
 	tray                        *mygo.Tray
+	startup                     startupService
 	quitting                    bool
 	source, query, page, status string
 	results, queue              []library.Track
