@@ -1,0 +1,25 @@
+{
+  "url": "https://github.com/BMingSY/go-music-dl/releases/download/native-v0.1.3/music-dl-0.1.3-windows-amd64.tar.gz",
+  "sha256": "a92ba5ac0a0eba88e025e55745001c54086302359c633857905c18c2fb9e9bf9",
+  "files": {
+    "avcodec-63.dll": "c4f0c6de391a48919a0ed8a5277ee7ce3738faea3ba055f0c82f37717acc78aa",
+    "avdevice-63.dll": "f8266bb441b95ad2db089c0aa4cf0fddefd11c5225d598a3a447a97d6ee6e480",
+    "avfilter-12.dll": "9643f05e5629190b2dd1f1bfed3a7e86a7a6c1f5f4790099b5ff4c1c2f61ade7",
+    "avformat-63.dll": "26417290073906140e61ef35adfad2ec24c4646365d7fdf8f3ee41b7195defd3",
+    "avutil-61.dll": "5cafd889edd3d85e6f0a5fd72dedbb6267efa0b7104674eba3d65c827caebaff",
+    "ffmpeg.exe": "dcd7f2e21b2c94c4acd2c7e01822f6c52ddba744e1173f9774c9cadb62cec154",
+    "ffprobe.exe": "33a3c0a5a4674d093390f93db45bf621d292c796fd98e0e42b8f778637badbc3",
+    "libwinpthread-1.dll": "db1a0fc43ab2f0f8d9c87712567f79601b5f868b9bed514d3335f9016de692ec",
+    "licenses/MinGW-winpthreads.txt": "1c8d23063c3772b9435831410b31b51fef3d9cf2138a442dc367ef5d72239f67",
+    "licenses/ffmpeg-LICENSE.txt": "246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30",
+    "licenses/freetype-LICENSE.txt": "08c135755dd589039470f1fdbb400daaabaaa50d0b366d19cebff4d22986baa1",
+    "licenses/freetype-NOTICE.txt": "2e3bbb7d7c5c396368dd0853a790ec29ce5b8647163dde42a0493fb0d6556b2b",
+    "licenses/fribidi-LICENSE.txt": "32434afcc8666ba060e111d715bfdb6c2d5dd8a35fa4d3ab8ad67d8f850d2f2b",
+    "licenses/harfbuzz-LICENSE.txt": "ba8f810f2455c2f08e2d56bb49b72f37fcf68f1f4fade38977cfd7372050ad64",
+    "licenses/libass-LICENSE.txt": "f7e30699d02798351e7f839e3d3bfeb29ce65e44efa7735c225464c4fd7dfe9c",
+    "licenses/zlib-LICENSE.txt": "845efc77857d485d91fb3e0b884aaa929368c717ae8186b66fe1ed2495753243",
+    "media-sources.json": "caef4f32407b95b0a5250d6db95e0cc26bbdf17b522f94e1dcf69afc4673ee97",
+    "swresample-7.dll": "1f1cfe9a34c2501a0ee90f7236e91e3e6acf92d144c22366ba3fe0cdff25ed38",
+    "swscale-10.dll": "2400928e1b3e3fddb5afa51f603fecfa4fc2a2790c3e0534b85e45b968c03863"
+  }
+}

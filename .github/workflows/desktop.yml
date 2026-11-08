@@ -61,21 +61,17 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Install FFmpeg on Windows
+      - name: Prepare pinned Windows FFmpeg
         if: runner.os == 'Windows'
-        shell: pwsh
         run: |
-          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
-            choco install ffmpeg --yes --no-progress --limit-output
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
+          go run ./tools/bundle-ffmpeg -platform windows-amd64
       - name: Cache macOS FFmpeg
         if: runner.os == 'macOS'
         id: macos-media
         uses: actions/cache@v4
         with:
           path: resources/${{ matrix.target }}/
-          key: ci-media-${{ matrix.target }}-${{ hashFiles('tools/bundle-ffmpeg/main.go') }}
+          key: ci-media-${{ matrix.target }}-${{ hashFiles('tools/bundle-ffmpeg/recipe.go') }}
       - name: Build FFmpeg on macOS
         if: runner.os == 'macOS' && steps.macos-media.outputs.cache-hit != 'true'
         env:
@@ -85,8 +81,7 @@ jobs:
         run: |
           brew install cmake ninja meson pkg-config
           go run ./tools/bundle-ffmpeg -platform "$MEDIA_TARGET"
-      - name: Use bundled FFmpeg on macOS
-        if: runner.os == 'macOS'
+      - name: Use bundled FFmpeg
         env:
           MEDIA_TARGET: ${{ matrix.target }}
         run: printf '%s\n' "$PWD/resources/$MEDIA_TARGET" >> "$GITHUB_PATH"
