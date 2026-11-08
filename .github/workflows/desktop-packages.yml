@@ -17,8 +17,10 @@ jobs:
         include:
           - runner: ubuntu-latest
             target: windows-amd64
+            recipe: tools/bundle-ffmpeg/windows-bundle.json
           - runner: macos-15
             target: darwin-arm64
+            recipe: tools/bundle-ffmpeg/recipe.go
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
     steps:
@@ -27,20 +29,16 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Install compiler dependencies
+        if: runner.os == 'macOS'
         shell: bash
         run: |
-          if [[ "$RUNNER_OS" == Linux ]]; then
-            sudo apt-get update -qq
-            sudo apt-get install -y gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 cmake ninja-build meson pkg-config
-          else
-            brew install cmake ninja meson pkg-config || brew upgrade cmake ninja meson pkg-config
-          fi
+          brew install cmake ninja meson pkg-config || brew upgrade cmake ninja meson pkg-config
       - uses: actions/cache@v4
         with:
           path: |
             ~/.cache/music-dl/media
             ~/Library/Caches/music-dl/media
-          key: media-${{ matrix.target }}-${{ hashFiles('tools/bundle-ffmpeg/main.go') }}
+          key: media-${{ matrix.target }}-${{ hashFiles(matrix.recipe) }}
       - name: Build media tools
         run: go run ./tools/bundle-ffmpeg -platform '${{ matrix.target }}'
       - uses: actions/upload-artifact@v4
@@ -152,7 +150,7 @@ jobs:
         with:
           path: packages
           pattern: music-dl-*
-      - name: Publish release
+      - name: Create verified release draft
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -161,4 +159,3 @@ jobs:
           awk -v ver="$release_version" '/^## / {if(found) exit; if($2==ver) {found=1; next}} found' CHANGELOG.md > release-notes.md
           test -s release-notes.md
           gh release create "$GITHUB_REF_NAME" release-assets/* --repo "$GITHUB_REPOSITORY" --verify-tag --draft --title "music-dl $release_version" --notes-file release-notes.md
-          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest
