@@ -156,6 +156,17 @@ func runSmoke(s *app, dir, file string) error {
 			return e
 		}
 	}
+	// Exercise the native login-item query used by the settings switch
+	// without changing the user's startup registration.
+	mygo.RunOnMain(func() { s.modal = "settings"; s.redraw() })
+	time.Sleep(300 * time.Millisecond)
+	b, err := s.win.CapturePage()
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(dir, "settings.png"), b, 0600); err != nil {
+		return err
+	}
 	return nil
 }
 

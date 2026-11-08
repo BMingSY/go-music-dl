@@ -119,6 +119,7 @@ func settingToggle(c *ui.Context, value *bool, title, hint string) bool {
 }
 
 func (s *app) generalSettings(c *ui.Context) {
+	s.startupSettings(c)
 	if settingToggle(c, &s.cfg.FloatingLyrics, "播放音乐时显示悬浮窗", "关闭后，播放音乐时不自动显示悬浮窗。") && s.mini != nil {
 		if s.cfg.FloatingLyrics && s.playing {
 			s.mini.Show()
