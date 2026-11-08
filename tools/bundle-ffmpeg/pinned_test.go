@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -134,5 +135,39 @@ func TestMediaLockRejectsApplicationAndUnsafePaths(t *testing.T) {
 				t.Fatalf("unsafe media name accepted: %q", name)
 			}
 		})
+	}
+}
+
+func TestPinnedMediaDoesNotDuplicateSharedResources(t *testing.T) {
+	var lock bundleLock
+	if err := json.Unmarshal(windowsBundle, &lock); err != nil {
+		t.Fatal(err)
+	}
+	shared := filepath.Join("..", "..", "resources")
+	if err := filepath.WalkDir(filepath.Join(shared, "licenses"), func(file string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		name, err := filepath.Rel(shared, file)
+		if err != nil {
+			return err
+		}
+		if _, duplicate := lock.Files[filepath.ToSlash(name)]; duplicate {
+			t.Errorf("pinned media duplicates the shared resource %s", name)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for name := range lock.Files {
+		if strings.HasPrefix(name, "licenses/") {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(shared, filepath.FromSlash(name))); err == nil {
+			t.Errorf("pinned media duplicates the shared resource %s", name)
+		}
 	}
 }
