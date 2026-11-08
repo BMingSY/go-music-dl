@@ -6,11 +6,9 @@ import (
 	"time"
 
 	"github.com/BMingSY/go-music-dl/internal/library"
-	"github.com/BMingSY/go-music-dl/internal/lyrics"
 	"github.com/BMingSY/go-music-dl/internal/playback"
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/audio"
-	"github.com/egoist/mygo/ui"
 )
 
 func (s *app) tick() {
@@ -38,20 +36,29 @@ func (s *app) playFrom(index int, tracks []library.Track, position time.Duration
 	if index < 0 || index >= len(tracks) {
 		return
 	}
-	s.previewCover = nil
-	s.previewLyrics = ""
+	track := tracks[index]
+	sameTrack := s.current != nil && s.current.Key() == track.Key()
+	if !sameTrack {
+		s.previewCover = nil
+		s.previewLyrics = ""
+		s.cover = nil
+		s.coverData = nil
+		s.lyricText = ""
+		s.lines = nil
+		s.lastLyric = -1
+		s.duration = time.Duration(track.Duration) * time.Second
+	}
+	if s.duration <= 0 {
+		s.duration = time.Duration(track.Duration) * time.Second
+	}
 	s.stop()
 	s.playID++
 	id := s.playID
 	s.queue = append([]library.Track(nil), tracks...)
 	s.queueIndex = index
-	track := tracks[index]
 	s.current = &track
 	s.playerExpanded = true
-	s.cover = nil
-	s.lines = nil
-	s.position = resumePosition(position, time.Duration(track.Duration)*time.Second)
-	s.duration = time.Duration(track.Duration) * time.Second
+	s.position = resumePosition(position, s.duration)
 	s.loading = true
 	s.status = "正在准备播放…"
 	ctx, cancel := context.WithCancel(s.ctx)
@@ -115,7 +122,7 @@ func (s *app) playFrom(index int, tracks []library.Track, position time.Duration
 			if s.cfg.FloatingLyrics && s.mini != nil {
 				s.mini.Show()
 			}
-			mygo.NowPlaying.Set(mygo.NowPlayingInfo{Title: track.Name, Artist: track.Artist, Album: track.Album, Duration: s.duration, Commands: mygo.MediaPlay | mygo.MediaPause | mygo.MediaNext | mygo.MediaPrevious | mygo.MediaSeek})
+			s.syncNowPlayingMetadata()
 			s.syncMedia()
 		})
 		lyric, cover := library.Metadata(ctx, track, cfg)
@@ -123,17 +130,11 @@ func (s *app) playFrom(index int, tracks []library.Track, position time.Duration
 			return
 		}
 		s.update(func() {
-			if id != s.playID {
+			if id != s.playID || ctx.Err() != nil {
 				return
 			}
-			if s.previewLyrics == "" {
-				s.lines = lyrics.Parse(lyric)
-				s.lastLyric = -1
-			}
-			if len(cover) > 0 && len(s.previewCover) == 0 {
-				s.cover, _ = ui.DecodeBitmap(cover)
-			}
-			mygo.NowPlaying.Set(mygo.NowPlayingInfo{Title: track.Name, Artist: track.Artist, Album: track.Album, Artwork: cover, Duration: s.duration, Commands: mygo.MediaPlay | mygo.MediaPause | mygo.MediaNext | mygo.MediaPrevious | mygo.MediaSeek})
+			s.applyPlaybackMetadata(lyric, cover)
+			s.syncNowPlayingMetadata()
 			s.syncMedia()
 		})
 	}()

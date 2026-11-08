@@ -81,6 +81,8 @@ type app struct {
 	queueIndex                  int
 	current                     *library.Track
 	cover                       *ui.Bitmap
+	coverData                   []byte
+	lyricText                   string
 	lines                       []lyrics.Line
 	list                        ui.ListState
 	player                      *audio.Player
