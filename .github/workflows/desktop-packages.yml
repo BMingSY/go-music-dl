@@ -38,6 +38,11 @@ jobs:
             ~/.cache/music-dl/media
             ~/Library/Caches/music-dl/media
           key: media-${{ matrix.target }}-${{ hashFiles(matrix.recipe) }}
+      - name: Download pinned Windows media
+        if: matrix.target == 'windows-amd64'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/fetch-windows-media.py
       - name: Build media tools
         run: go run ./tools/bundle-ffmpeg -platform '${{ matrix.target }}'
       - uses: actions/upload-artifact@v4
